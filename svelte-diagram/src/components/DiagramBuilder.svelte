@@ -140,6 +140,28 @@
     }
   }
   
+  // Helper function to find the closest point on a line segment
+  function closestPointOnLineSegment(x, y, x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const lengthSquared = dx * dx + dy * dy;
+    
+    if (lengthSquared === 0) {
+      return { x: x1, y: y1 };
+    }
+    
+    // Calculate projection parameter t
+    let t = ((x - x1) * dx + (y - y1) * dy) / lengthSquared;
+    
+    // Clamp t to [0, 1] to stay on the segment
+    t = Math.max(0, Math.min(1, t));
+    
+    return {
+      x: x1 + t * dx,
+      y: y1 + t * dy
+    };
+  }
+  
   // Helper function to find snap points near a coordinate
   function findSnapPoint(x, y, excludeElementId) {
     const snapDistance = 10; // pixels
@@ -183,7 +205,7 @@
           }
         }
       } else if (el.type === 'line') {
-        // Check line endpoints
+        // First check line endpoints
         const points = [
           { x: el.x1, y: el.y1 },
           { x: el.x2, y: el.y2 }
@@ -194,6 +216,14 @@
           if (dist < snapDistance) {
             return point;
           }
+        }
+        
+        // Then check if close to the line itself
+        const closestPoint = closestPointOnLineSegment(x, y, el.x1, el.y1, el.x2, el.y2);
+        const distToLine = Math.sqrt(Math.pow(x - closestPoint.x, 2) + Math.pow(y - closestPoint.y, 2));
+        
+        if (distToLine < snapDistance) {
+          return closestPoint;
         }
       }
     }
@@ -359,6 +389,14 @@
           const snapPoint = findSnapPoint(currentX, currentY, selectedElement.id);
           let finalX = snapPoint ? snapPoint.x : currentX;
           let finalY = snapPoint ? snapPoint.y : currentY;
+          
+          // If snapping and line has a circle, offset by circle radius to keep it visible
+          if (snapPoint && selectedElement.hasCircle) {
+            const circleRadius = 4;
+            const angle = Math.atan2(snapPoint.y - selectedElement.y1, snapPoint.x - selectedElement.x1);
+            finalX = snapPoint.x - circleRadius * Math.cos(angle);
+            finalY = snapPoint.y - circleRadius * Math.sin(angle);
+          }
           
           if (e.shiftKey) {
             // Snap to 15-degree intervals relative to the start
