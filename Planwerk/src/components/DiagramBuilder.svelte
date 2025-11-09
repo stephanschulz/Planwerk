@@ -1347,7 +1347,7 @@
               x2={element.x2} 
               y2={element.y2} 
               stroke="transparent" 
-              stroke-width="10" />
+              stroke-width="20" />
             
             <!-- Line label centered above line -->
             {#if editingText?.id === element.id && editingLineLabel}
