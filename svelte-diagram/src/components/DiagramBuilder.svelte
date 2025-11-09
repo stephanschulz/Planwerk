@@ -629,8 +629,14 @@
   
   function pasteFromClipboard() {
     const offset = 20; // Offset pasted elements by 20px
-    const newElements = clipboard.map(el => {
-      const newEl = {...el, id: Date.now() + Math.random()};
+    const newIds = [];
+    const baseId = Date.now();
+    
+    const newElements = clipboard.map((el, index) => {
+      const newId = baseId + index + Math.random() * 1000;
+      newIds.push(newId);
+      
+      const newEl = {...el, id: newId};
       
       if (newEl.type === 'line') {
         newEl.x1 += offset;
@@ -646,8 +652,10 @@
     });
     
     elements = [...elements, ...newElements];
-    selectedElements = newElements;
-    selectedElement = newElements[0] || null;
+    
+    // Select the newly pasted elements by finding them in the elements array by ID
+    selectedElements = elements.filter(el => newIds.includes(el.id));
+    selectedElement = selectedElements[0] || null;
   }
   
   function handleKeyDown(e) {
