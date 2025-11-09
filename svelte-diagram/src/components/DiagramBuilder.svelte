@@ -13,6 +13,9 @@
   let editingLineLabel = $state(false);
   let savedDesigns = $state([]);
   let currentDesignName = $state('Untitled');
+  let showGrid = $state(false);
+  let gridSize = $state(20);
+  let isSnapKeyPressed = $state(false);
   
   // Template for new elements
   function createBox(x, y) {
@@ -138,6 +141,14 @@
         }
       }, 50);
     }
+  }
+  
+  // Helper function to snap to grid
+  function snapToGrid(x, y) {
+    return {
+      x: Math.round(x / gridSize) * gridSize,
+      y: Math.round(y / gridSize) * gridSize
+    };
   }
   
   // Helper function to find the closest point on a line segment
@@ -413,16 +424,26 @@
       }
     } else if (isDragging) {
       // Handle dragging
+      let finalX = dragStart.elementX + dx;
+      let finalY = dragStart.elementY + dy;
+      
+      // Apply grid snapping if 's' key is held
+      if (isSnapKeyPressed) {
+        const snapped = snapToGrid(finalX, finalY);
+        finalX = snapped.x;
+        finalY = snapped.y;
+      }
+      
       if (selectedElement.type === 'line') {
         const width = dragStart.elementX2 - dragStart.elementX;
         const height = dragStart.elementY2 - dragStart.elementY;
-        selectedElement.x1 = dragStart.elementX + dx;
-        selectedElement.y1 = dragStart.elementY + dy;
-        selectedElement.x2 = selectedElement.x1 + width;
-        selectedElement.y2 = selectedElement.y1 + height;
+        selectedElement.x1 = finalX;
+        selectedElement.y1 = finalY;
+        selectedElement.x2 = finalX + width;
+        selectedElement.y2 = finalY + height;
       } else {
-        selectedElement.x = dragStart.elementX + dx;
-        selectedElement.y = dragStart.elementY + dy;
+        selectedElement.x = finalX;
+        selectedElement.y = finalY;
       }
     }
   }
@@ -442,6 +463,11 @@
   }
   
   function handleKeyDown(e) {
+    // Track 's' key for snap-to-grid
+    if (e.key === 's' || e.key === 'S') {
+      isSnapKeyPressed = true;
+    }
+    
     // Don't process any keys if we're editing text
     if (editingText || editingLineLabel) {
       return;
@@ -489,6 +515,13 @@
           selectedElement.x += 1;
         }
       }
+    }
+  }
+  
+  function handleKeyUp(e) {
+    // Track 's' key release for snap-to-grid
+    if (e.key === 's' || e.key === 'S') {
+      isSnapKeyPressed = false;
     }
   }
   
@@ -591,8 +624,12 @@
   
   onMount(() => {
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
     loadSavedDesignsList();
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
   });
 </script>
 
@@ -743,6 +780,40 @@
         Import JSON
       </button>
     </div>
+    
+    <div class="tool-section">
+      <h3>Grid</h3>
+      
+      <button 
+        class="tool-btn"
+        class:active={showGrid}
+        onclick={() => showGrid = !showGrid}
+        title="Toggle grid visibility">
+        <svg width="20" height="20" viewBox="0 0 20 20">
+          <line x1="5" y1="0" x2="5" y2="20" stroke="currentColor" stroke-width="1"/>
+          <line x1="10" y1="0" x2="10" y2="20" stroke="currentColor" stroke-width="1"/>
+          <line x1="15" y1="0" x2="15" y2="20" stroke="currentColor" stroke-width="1"/>
+          <line x1="0" y1="5" x2="20" y2="5" stroke="currentColor" stroke-width="1"/>
+          <line x1="0" y1="10" x2="20" y2="10" stroke="currentColor" stroke-width="1"/>
+          <line x1="0" y1="15" x2="20" y2="15" stroke="currentColor" stroke-width="1"/>
+        </svg>
+        <span>Show Grid</span>
+      </button>
+      
+      <label>
+        Grid Size:
+        <input 
+          type="number" 
+          bind:value={gridSize}
+          min="5"
+          max="100"
+          step="5"
+          class="grid-size-input"
+        />
+      </label>
+      
+      <p class="grid-hint">Hold 'S' while dragging to snap to grid</p>
+    </div>
   </div>
   </div>
   
@@ -764,7 +835,23 @@
           orient="auto">
           <polygon points="0 0, 10 3, 0 6" fill="#000000" />
         </marker>
+        
+        <pattern 
+          id="grid" 
+          width={gridSize} 
+          height={gridSize} 
+          patternUnits="userSpaceOnUse">
+          <path 
+            d="M {gridSize} 0 L 0 0 0 {gridSize}" 
+            fill="none" 
+            stroke="#e0e0e0" 
+            stroke-width="0.5"/>
+        </pattern>
       </defs>
+      
+      {#if showGrid}
+        <rect width="100%" height="100%" fill="url(#grid)" />
+      {/if}
       
       {#each elements as element (element.id)}
         {#if element.type === 'box'}
@@ -1644,6 +1731,29 @@
     font-size: 10px;
     line-height: 1.4;
     font-family: ui-monospace, 'Courier New', monospace;
+  }
+  
+  .grid-size-input {
+    width: 60px;
+    padding: 4px 6px;
+    margin-top: 4px;
+    border: 1px solid #000000;
+    background: #ffffff;
+    font-family: ui-monospace, 'Courier New', monospace;
+    font-size: 11px;
+  }
+  
+  .grid-size-input:focus {
+    outline: 2px solid #ff5722;
+    outline-offset: 0;
+  }
+  
+  .grid-hint {
+    font-size: 9px;
+    color: #666666;
+    margin-top: 8px;
+    line-height: 1.3;
+    font-style: italic;
   }
   
   .canvas {
