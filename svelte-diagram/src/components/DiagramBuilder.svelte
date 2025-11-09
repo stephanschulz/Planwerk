@@ -2,7 +2,8 @@
   import { onMount } from 'svelte';
   
   let elements = $state([]);
-  let selectedElement = $state(null);
+  let selectedElements = $state([]); // Changed to array for multi-select
+  let selectedElement = $state(null); // Keep for backward compatibility
   let tool = $state('select'); // 'select', 'box', 'line', 'text'
   let dragStart = $state(null);
   let isDragging = $state(false);
@@ -16,6 +17,7 @@
   let showGrid = $state(false);
   let gridSize = $state(20);
   let isSnapKeyPressed = $state(false);
+  let clipboard = $state([]);
   
   // Template for new elements
   function createBox(x, y) {
@@ -79,6 +81,7 @@
   function handleCanvasClick(e) {
     if (tool === 'select') {
       selectedElement = null;
+      selectedElements = [];
       editingText = null;
       editingLineLabel = false;
       return;
@@ -103,7 +106,24 @@
   
   function handleElementClick(e, element) {
     e.stopPropagation();
-    selectedElement = element;
+    
+    // Multi-select with Ctrl/Cmd key
+    if (e.ctrlKey || e.metaKey) {
+      const index = selectedElements.findIndex(el => el.id === element.id);
+      if (index >= 0) {
+        // Deselect if already selected
+        selectedElements = selectedElements.filter(el => el.id !== element.id);
+      } else {
+        // Add to selection
+        selectedElements = [...selectedElements, element];
+      }
+    } else {
+      // Single select
+      selectedElements = [element];
+    }
+    
+    // Update selectedElement for backward compatibility
+    selectedElement = selectedElements[0] || null;
   }
   
   function handleDoubleClick(e, element) {
@@ -274,10 +294,26 @@
     }
     
     e.stopPropagation();
+    
+    // If clicked element is not in selection, select it (unless multi-selecting)
+    if (!selectedElements.find(el => el.id === element.id) && !(e.ctrlKey || e.metaKey)) {
+      selectedElements = [element];
+    }
+    
     selectedElement = element;
     isDragging = true;
     
     const rect = canvasElement.getBoundingClientRect();
+    
+    // Store initial positions for all selected elements
+    const elementsData = selectedElements.map(el => ({
+      element: el,
+      startX: el.x || el.x1,
+      startY: el.y || el.y1,
+      startX2: el.x2,
+      startY2: el.y2
+    }));
+    
     dragStart = {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
@@ -287,7 +323,8 @@
       elementHeight: element.height,
       elementRadius: element.radius,
       elementX2: element.x2,
-      elementY2: element.y2
+      elementY2: element.y2,
+      elementsData: elementsData // Store for multi-element dragging
     };
   }
   
@@ -475,45 +512,89 @@
         }
       }
     } else if (isDragging) {
-      // Handle dragging
-      let finalX = dragStart.elementX + dx;
-      let finalY = dragStart.elementY + dy;
-      
-      // Apply grid snapping if 's' key is held
-      if (isSnapKeyPressed) {
-        const snapped = snapToGrid(finalX, finalY);
-        finalX = snapped.x;
-        finalY = snapped.y;
-      }
-      
-      if (selectedElement.type === 'line') {
-        const width = dragStart.elementX2 - dragStart.elementX;
-        const height = dragStart.elementY2 - dragStart.elementY;
-        
-        if (isSnapKeyPressed) {
-          // Snap both endpoints to grid
-          const snappedStart = snapToGrid(finalX, finalY);
-          const snappedEnd = snapToGrid(finalX + width, finalY + height);
-          selectedElement.x1 = snappedStart.x;
-          selectedElement.y1 = snappedStart.y;
-          selectedElement.x2 = snappedEnd.x;
-          selectedElement.y2 = snappedEnd.y;
+      // Handle dragging - move all selected elements together
+      if (dragStart.elementsData && dragStart.elementsData.length > 1) {
+        // Multi-element drag
+        for (const data of dragStart.elementsData) {
+          let newX = data.startX + dx;
+          let newY = data.startY + dy;
           
-          // Also apply axis snapping
-          const axisSnapped = snapLineToAxis(selectedElement.x1, selectedElement.y1, selectedElement.x2, selectedElement.y2);
-          selectedElement.x1 = axisSnapped.x1;
-          selectedElement.y1 = axisSnapped.y1;
-          selectedElement.x2 = axisSnapped.x2;
-          selectedElement.y2 = axisSnapped.y2;
-        } else {
-          selectedElement.x1 = finalX;
-          selectedElement.y1 = finalY;
-          selectedElement.x2 = finalX + width;
-          selectedElement.y2 = finalY + height;
+          // Apply grid snapping if 's' key is held
+          if (isSnapKeyPressed) {
+            const snapped = snapToGrid(newX, newY);
+            newX = snapped.x;
+            newY = snapped.y;
+          }
+          
+          if (data.element.type === 'line') {
+            const width = data.startX2 - data.startX;
+            const height = data.startY2 - data.startY;
+            
+            if (isSnapKeyPressed) {
+              const snappedEnd = snapToGrid(newX + width, newY + height);
+              data.element.x1 = newX;
+              data.element.y1 = newY;
+              data.element.x2 = snappedEnd.x;
+              data.element.y2 = snappedEnd.y;
+              
+              // Apply axis snapping
+              const axisSnapped = snapLineToAxis(data.element.x1, data.element.y1, data.element.x2, data.element.y2);
+              data.element.x1 = axisSnapped.x1;
+              data.element.y1 = axisSnapped.y1;
+              data.element.x2 = axisSnapped.x2;
+              data.element.y2 = axisSnapped.y2;
+            } else {
+              data.element.x1 = newX;
+              data.element.y1 = newY;
+              data.element.x2 = newX + width;
+              data.element.y2 = newY + height;
+            }
+          } else {
+            data.element.x = newX;
+            data.element.y = newY;
+          }
         }
       } else {
-        selectedElement.x = finalX;
-        selectedElement.y = finalY;
+        // Single element drag (existing behavior)
+        let finalX = dragStart.elementX + dx;
+        let finalY = dragStart.elementY + dy;
+        
+        // Apply grid snapping if 's' key is held
+        if (isSnapKeyPressed) {
+          const snapped = snapToGrid(finalX, finalY);
+          finalX = snapped.x;
+          finalY = snapped.y;
+        }
+        
+        if (selectedElement.type === 'line') {
+          const width = dragStart.elementX2 - dragStart.elementX;
+          const height = dragStart.elementY2 - dragStart.elementY;
+          
+          if (isSnapKeyPressed) {
+            // Snap both endpoints to grid
+            const snappedStart = snapToGrid(finalX, finalY);
+            const snappedEnd = snapToGrid(finalX + width, finalY + height);
+            selectedElement.x1 = snappedStart.x;
+            selectedElement.y1 = snappedStart.y;
+            selectedElement.x2 = snappedEnd.x;
+            selectedElement.y2 = snappedEnd.y;
+            
+            // Also apply axis snapping
+            const axisSnapped = snapLineToAxis(selectedElement.x1, selectedElement.y1, selectedElement.x2, selectedElement.y2);
+            selectedElement.x1 = axisSnapped.x1;
+            selectedElement.y1 = axisSnapped.y1;
+            selectedElement.x2 = axisSnapped.x2;
+            selectedElement.y2 = axisSnapped.y2;
+          } else {
+            selectedElement.x1 = finalX;
+            selectedElement.y1 = finalY;
+            selectedElement.x2 = finalX + width;
+            selectedElement.y2 = finalY + height;
+          }
+        } else {
+          selectedElement.x = finalX;
+          selectedElement.y = finalY;
+        }
       }
     }
   }
@@ -526,10 +607,40 @@
   }
   
   function deleteSelected() {
-    if (selectedElement) {
-      elements = elements.filter(el => el.id !== selectedElement.id);
+    if (selectedElements.length > 0) {
+      const selectedIds = selectedElements.map(el => el.id);
+      elements = elements.filter(el => !selectedIds.includes(el.id));
+      selectedElements = [];
       selectedElement = null;
     }
+  }
+  
+  function copySelected() {
+    // Deep clone selected elements
+    clipboard = selectedElements.map(el => ({...el}));
+  }
+  
+  function pasteFromClipboard() {
+    const offset = 20; // Offset pasted elements by 20px
+    const newElements = clipboard.map(el => {
+      const newEl = {...el, id: Date.now() + Math.random()};
+      
+      if (newEl.type === 'line') {
+        newEl.x1 += offset;
+        newEl.y1 += offset;
+        newEl.x2 += offset;
+        newEl.y2 += offset;
+      } else {
+        newEl.x += offset;
+        newEl.y += offset;
+      }
+      
+      return newEl;
+    });
+    
+    elements = [...elements, ...newElements];
+    selectedElements = newElements;
+    selectedElement = newElements[0] || null;
   }
   
   function handleKeyDown(e) {
@@ -543,46 +654,60 @@
       return;
     }
     
-    // Delete/Backspace to remove element
-    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElement) {
+    // Copy: Ctrl/Cmd+C
+    if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedElements.length > 0) {
+      e.preventDefault();
+      copySelected();
+      return;
+    }
+    
+    // Paste: Ctrl/Cmd+V
+    if ((e.ctrlKey || e.metaKey) && e.key === 'v' && clipboard.length > 0) {
+      e.preventDefault();
+      pasteFromClipboard();
+      return;
+    }
+    
+    // Delete/Backspace to remove elements
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElements.length > 0) {
       e.preventDefault();
       deleteSelected();
       return;
     }
     
-    // Arrow key nudging - works when element is selected and not editing
-    if (selectedElement) {
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        if (selectedElement.type === 'line') {
-          selectedElement.y1 -= 1;
-          selectedElement.y2 -= 1;
-        } else {
-          selectedElement.y -= 1;
-        }
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        if (selectedElement.type === 'line') {
-          selectedElement.y1 += 1;
-          selectedElement.y2 += 1;
-        } else {
-          selectedElement.y += 1;
-        }
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        if (selectedElement.type === 'line') {
-          selectedElement.x1 -= 1;
-          selectedElement.x2 -= 1;
-        } else {
-          selectedElement.x -= 1;
-        }
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        if (selectedElement.type === 'line') {
-          selectedElement.x1 += 1;
-          selectedElement.x2 += 1;
-        } else {
-          selectedElement.x += 1;
+    // Arrow key nudging - works when elements are selected and not editing
+    if (selectedElements.length > 0) {
+      e.preventDefault();
+      
+      for (const element of selectedElements) {
+        if (e.key === 'ArrowUp') {
+          if (element.type === 'line') {
+            element.y1 -= 1;
+            element.y2 -= 1;
+          } else {
+            element.y -= 1;
+          }
+        } else if (e.key === 'ArrowDown') {
+          if (element.type === 'line') {
+            element.y1 += 1;
+            element.y2 += 1;
+          } else {
+            element.y += 1;
+          }
+        } else if (e.key === 'ArrowLeft') {
+          if (element.type === 'line') {
+            element.x1 -= 1;
+            element.x2 -= 1;
+          } else {
+            element.x -= 1;
+          }
+        } else if (e.key === 'ArrowRight') {
+          if (element.type === 'line') {
+            element.x1 += 1;
+            element.x2 += 1;
+          } else {
+            element.x += 1;
+          }
         }
       }
     }
@@ -931,7 +1056,7 @@
         {#if element.type === 'box'}
           <g 
             class="element box-element"
-            class:selected={selectedElement?.id === element.id}
+            class:selected={selectedElements.some(el => el.id === element.id)}
             onmousedown={(e) => handleMouseDown(e, element)}
             onclick={(e) => handleElementClick(e, element)}
             ondblclick={(e) => handleDoubleClick(e, element)}>
@@ -1045,7 +1170,7 @@
         {:else if element.type === 'circle'}
           <g 
             class="element circle-element"
-            class:selected={selectedElement?.id === element.id}
+            class:selected={selectedElements.some(el => el.id === element.id)}
             onmousedown={(e) => handleMouseDown(e, element)}
             onclick={(e) => handleElementClick(e, element)}
             ondblclick={(e) => handleDoubleClick(e, element)}>
@@ -1160,7 +1285,7 @@
           
           <g 
             class="element line-element"
-            class:selected={selectedElement?.id === element.id}
+            class:selected={selectedElements.some(el => el.id === element.id)}
             onmousedown={(e) => handleMouseDown(e, element)}
             onclick={(e) => handleElementClick(e, element)}
             ondblclick={(e) => handleDoubleClick(e, element)}>
@@ -1256,7 +1381,7 @@
         {:else if element.type === 'text'}
           <g 
             class="element text-element"
-            class:selected={selectedElement?.id === element.id}
+            class:selected={selectedElements.some(el => el.id === element.id)}
             onmousedown={(e) => handleMouseDown(e, element)}
             onclick={(e) => handleElementClick(e, element)}
             ondblclick={(e) => handleDoubleClick(e, element)}>
@@ -1300,7 +1425,7 @@
     
     <div class="canvas-hint">
       {#if tool === 'select'}
-        Click: select • Drag: move • Double-click: edit text/add line label • Arrow keys: nudge 1px • Line snap to edges • Hold Shift: box→square / line→angle-snap • Hold S: snap to grid • Enter: line break in text
+        Click: select • Ctrl/Cmd+Click: multi-select • Drag: move • Arrow keys: nudge 1px • Ctrl/Cmd+C: copy • Ctrl/Cmd+V: paste • Hold S: snap to grid • Hold Shift: box→square / line→angle-snap • Double-click: edit text
       {:else if tool === 'box'}
         Click anywhere to add a box • Hold Shift while resizing to force square • Hold S while dragging to snap to grid • When editing: Enter creates line break
       {:else if tool === 'circle'}
