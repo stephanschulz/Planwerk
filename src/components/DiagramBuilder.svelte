@@ -15,7 +15,7 @@
   let savedDesigns = $state([]);
   let currentDesignName = $state('Untitled');
   let showGrid = $state(false);
-  let gridSize = $state(20);
+  let gridSize = $state(10);
   let isSnapKeyPressed = $state(false);
   let clipboard = $state([]);
   let zoomLevel = $state(1);
