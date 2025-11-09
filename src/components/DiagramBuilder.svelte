@@ -1863,8 +1863,7 @@
 <button 
   class="about-btn" 
   onclick={() => showAboutModal = !showAboutModal}
-  title="About Planwerk">
-  ℹ️
+  title="About">
 </button>
 
 <!-- About Modal -->
@@ -1872,7 +1871,6 @@
   <div class="modal-overlay" onclick={() => showAboutModal = false}>
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <button class="modal-close" onclick={() => showAboutModal = false}>×</button>
-      <h2>About Planwerk</h2>
       <p>Made by <strong>Stephan Schulz</strong></p>
       <a href="https://github.com/stephanschulz/Planwerk/" target="_blank" rel="noopener noreferrer">
         View on GitHub →
@@ -2237,25 +2235,19 @@
     position: fixed;
     bottom: 20px;
     right: 20px;
-    width: 40px;
-    height: 40px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    background: #000000;
-    color: white;
-    border: 2px solid #000000;
-    font-size: 20px;
+    background: #ff5722;
+    border: 1px solid #000000;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    padding: 0;
     z-index: 1000;
     transition: all 0.2s;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   }
   
   .about-btn:hover {
-    background: #333333;
-    transform: scale(1.1);
+    transform: scale(1.5);
   }
   
   .modal-overlay {
@@ -2280,12 +2272,6 @@
     width: 90%;
     position: relative;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-  }
-  
-  .modal-content h2 {
-    margin: 0 0 16px 0;
-    font-size: 24px;
-    color: #000000;
   }
   
   .modal-content p {
