@@ -206,6 +206,11 @@
   function handleElementClick(e, element) {
     e.stopPropagation();
     
+    // Don't change selection if 'M' key is pressed (multi-select mode)
+    if (isMKeyPressed) {
+      return;
+    }
+    
     // Multi-select with Ctrl/Cmd key
     if (e.ctrlKey || e.metaKey) {
       const index = selectedElements.findIndex(el => el.id === element.id);
@@ -396,6 +401,11 @@
   function handleMouseDown(e, element) {
     // Don't start dragging if we're currently editing
     if (editingText || editingLineLabel) {
+      return;
+    }
+    
+    // Don't start dragging if 'M' key is pressed (multi-select mode)
+    if (isMKeyPressed) {
       return;
     }
     
@@ -784,29 +794,32 @@
       const minY = Math.min(selectionRect.startY, selectionRect.endY);
       const maxY = Math.max(selectionRect.startY, selectionRect.endY);
       
-      // Select all elements that are fully or partially within the selection rectangle
+      // Select all elements that are completely within the selection rectangle
       const selectedInRect = elements.filter(element => {
         if (element.type === 'box') {
-          // Check if box intersects with selection rectangle
-          return !(element.x + element.width < minX || 
-                   element.x > maxX || 
-                   element.y + element.height < minY || 
-                   element.y > maxY);
+          // Check if box is completely inside the rectangle
+          return element.x >= minX && 
+                 element.x + element.width <= maxX && 
+                 element.y >= minY && 
+                 element.y + element.height <= maxY;
         } else if (element.type === 'circle') {
+          // Check if entire circle is inside the rectangle
           const cx = element.x + element.radius;
           const cy = element.y + element.radius;
-          // Check if circle center is in rectangle or if circle intersects rectangle
-          const closestX = Math.max(minX, Math.min(cx, maxX));
-          const closestY = Math.max(minY, Math.min(cy, maxY));
-          const distanceSquared = (cx - closestX) ** 2 + (cy - closestY) ** 2;
-          return distanceSquared <= element.radius ** 2;
+          return (cx - element.radius) >= minX && 
+                 (cx + element.radius) <= maxX && 
+                 (cy - element.radius) >= minY && 
+                 (cy + element.radius) <= maxY;
         } else if (element.type === 'line') {
-          // Check if either endpoint is within the rectangle
-          return (element.x1 >= minX && element.x1 <= maxX && element.y1 >= minY && element.y1 <= maxY) ||
-                 (element.x2 >= minX && element.x2 <= maxX && element.y2 >= minY && element.y2 <= maxY);
+          // Check if both endpoints are within the rectangle
+          return element.x1 >= minX && element.x1 <= maxX && 
+                 element.y1 >= minY && element.y1 <= maxY &&
+                 element.x2 >= minX && element.x2 <= maxX && 
+                 element.y2 >= minY && element.y2 <= maxY;
         } else if (element.type === 'text') {
           // Check if text position is within rectangle
-          return element.x >= minX && element.x <= maxX && element.y >= minY && element.y <= maxY;
+          return element.x >= minX && element.x <= maxX && 
+                 element.y >= minY && element.y <= maxY;
         }
         return false;
       });
