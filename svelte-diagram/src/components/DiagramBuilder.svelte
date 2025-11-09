@@ -1727,18 +1727,22 @@
   .builder-container {
     display: flex;
     gap: 0;
-    height: 85vh;
+    height: 100%;
+    width: 100%;
     background: #ffffff;
     border: 2px solid #000000;
+    box-sizing: border-box;
   }
   
   .left-panel {
     display: flex;
     flex-direction: column;
+    height: 100%;
   }
   
   .toolbar {
     width: 220px;
+    height: 100%;
     background: #ffffff;
     border-right: 2px solid #000000;
     padding: 16px;
@@ -1746,14 +1750,17 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
+    box-sizing: border-box;
   }
   
   .properties-panel {
     width: 220px;
+    height: 100%;
     background: #ffffff;
     border-left: 2px solid #000000;
     padding: 16px;
     overflow-y: auto;
+    box-sizing: border-box;
   }
   
   .properties-panel h3 {
