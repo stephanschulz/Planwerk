@@ -1363,24 +1363,6 @@
       {/if}
       
       <g transform="translate({panX}, {panY}) scale({zoomLevel})">
-      <!-- Selection rectangle while drawing -->
-      {#if isDrawingSelection && selectionRect}
-        {@const minX = Math.min(selectionRect.startX, selectionRect.endX)}
-        {@const minY = Math.min(selectionRect.startY, selectionRect.endY)}
-        {@const width = Math.abs(selectionRect.endX - selectionRect.startX)}
-        {@const height = Math.abs(selectionRect.endY - selectionRect.startY)}
-        <rect 
-          x={minX} 
-          y={minY} 
-          width={width} 
-          height={height} 
-          fill="rgba(255, 87, 34, 0.1)" 
-          stroke="#ff5722" 
-          stroke-width="2"
-          stroke-dasharray="5,5"
-          pointer-events="none" />
-      {/if}
-      
       {#each elements as element (element.id)}
         {#if element.type === 'box'}
           <g 
@@ -1717,6 +1699,24 @@
           </g>
         {/if}
       {/each}
+      
+      <!-- Selection rectangle while drawing - on top of everything -->
+      {#if isDrawingSelection && selectionRect}
+        {@const minX = Math.min(selectionRect.startX, selectionRect.endX)}
+        {@const minY = Math.min(selectionRect.startY, selectionRect.endY)}
+        {@const width = Math.abs(selectionRect.endX - selectionRect.startX)}
+        {@const height = Math.abs(selectionRect.endY - selectionRect.startY)}
+        <rect 
+          x={minX} 
+          y={minY} 
+          width={width} 
+          height={height} 
+          fill="none" 
+          stroke="#ff5722" 
+          stroke-width="2"
+          stroke-dasharray="5,5"
+          pointer-events="none" />
+      {/if}
       </g>
     </svg>
     
