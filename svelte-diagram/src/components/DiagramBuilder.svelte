@@ -798,19 +798,21 @@
         />
       </label>
       
-      <button 
-        class="action-btn"
-        onclick={newDesign}
-        title="Start a new design">
-        New
-      </button>
-      
-      <button 
-        class="action-btn"
-        onclick={saveDiagram}
-        title="Save current design">
-        Save
-      </button>
+      <div class="button-row">
+        <button 
+          class="action-btn"
+          onclick={newDesign}
+          title="Start a new design">
+          New
+        </button>
+        
+        <button 
+          class="action-btn"
+          onclick={saveDiagram}
+          title="Save current design">
+          Save
+        </button>
+      </div>
       
       {#if savedDesigns.length > 0}
         <label>
@@ -836,19 +838,21 @@
         </button>
       {/if}
       
-      <button 
-        class="action-btn"
-        onclick={exportDiagram}
-        title="Export as JSON file">
-        Export JSON
-      </button>
-      
-      <button 
-        class="action-btn"
-        onclick={importDiagram}
-        title="Import JSON file">
-        Import JSON
-      </button>
+      <div class="button-row">
+        <button 
+          class="action-btn"
+          onclick={exportDiagram}
+          title="Export design as file">
+          Export
+        </button>
+        
+        <button 
+          class="action-btn"
+          onclick={importDiagram}
+          title="Import design from file">
+          Import
+        </button>
+      </div>
     </div>
     
     <div class="tool-section">
@@ -1727,6 +1731,13 @@
     flex-shrink: 0;
   }
   
+  .button-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  
   .action-btn {
     width: 100%;
     padding: 10px 12px;
@@ -1739,6 +1750,10 @@
     color: #000000;
     margin-bottom: 8px;
     transition: all 0.2s ease;
+  }
+  
+  .button-row .action-btn {
+    margin-bottom: 0;
   }
   
   .action-btn:hover:not(:disabled) {
