@@ -25,7 +25,26 @@
       height: 50,
       text: 'New Box',
       shadow: true,
-      dashed: false
+      dashed: false,
+      fontSize: 12,
+      bgColor: '#ffffff',
+      textColor: '#000000'
+    };
+  }
+  
+  function createCircle(x, y) {
+    return {
+      id: Date.now(),
+      type: 'circle',
+      x: x - 50,
+      y: y - 50,
+      radius: 50,
+      text: 'Circle',
+      shadow: true,
+      dashed: false,
+      fontSize: 12,
+      bgColor: '#ffffff',
+      textColor: '#000000'
     };
   }
   
@@ -68,6 +87,8 @@
     
     if (tool === 'box') {
       elements = [...elements, createBox(x, y)];
+    } else if (tool === 'circle') {
+      elements = [...elements, createCircle(x, y)];
     } else if (tool === 'text') {
       elements = [...elements, createText(x, y)];
     } else if (tool === 'line') {
@@ -145,6 +166,22 @@
             return edge;
           }
         }
+      } else if (el.type === 'circle') {
+        // Check circle cardinal points
+        const points = [
+          { x: el.x + el.radius, y: el.y }, // top
+          { x: el.x + el.radius * 2, y: el.y + el.radius }, // right
+          { x: el.x + el.radius, y: el.y + el.radius * 2 }, // bottom
+          { x: el.x, y: el.y + el.radius }, // left
+          { x: el.x + el.radius, y: el.y + el.radius }, // center
+        ];
+        
+        for (const point of points) {
+          const dist = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(y - point.y, 2));
+          if (dist < snapDistance) {
+            return point;
+          }
+        }
       } else if (el.type === 'line') {
         // Check line endpoints
         const points = [
@@ -187,6 +224,7 @@
       elementY: element.y || element.y1,
       elementWidth: element.width,
       elementHeight: element.height,
+      elementRadius: element.radius,
       elementX2: element.x2,
       elementY2: element.y2
     };
@@ -206,6 +244,7 @@
       elementY: element.y || element.y1,
       elementWidth: element.width,
       elementHeight: element.height,
+      elementRadius: element.radius,
       elementX2: element.x2,
       elementY2: element.y2
     };
@@ -225,25 +264,77 @@
       // Handle resizing
       if (selectedElement.type === 'box') {
         if (resizeHandle === 'se') {
-          selectedElement.width = Math.max(50, dragStart.elementWidth + dx);
-          selectedElement.height = Math.max(30, dragStart.elementHeight + dy);
+          const newWidth = Math.max(50, dragStart.elementWidth + dx);
+          const newHeight = Math.max(30, dragStart.elementHeight + dy);
+          
+          if (e.shiftKey) {
+            // Force square by using the larger dimension
+            const size = Math.max(newWidth, newHeight);
+            selectedElement.width = size;
+            selectedElement.height = size;
+          } else {
+            selectedElement.width = newWidth;
+            selectedElement.height = newHeight;
+          }
         } else if (resizeHandle === 'sw') {
           const newWidth = Math.max(50, dragStart.elementWidth - dx);
-          selectedElement.x = dragStart.elementX + (dragStart.elementWidth - newWidth);
-          selectedElement.width = newWidth;
-          selectedElement.height = Math.max(30, dragStart.elementHeight + dy);
+          const newHeight = Math.max(30, dragStart.elementHeight + dy);
+          
+          if (e.shiftKey) {
+            const size = Math.max(newWidth, newHeight);
+            selectedElement.x = dragStart.elementX + (dragStart.elementWidth - size);
+            selectedElement.width = size;
+            selectedElement.height = size;
+          } else {
+            selectedElement.x = dragStart.elementX + (dragStart.elementWidth - newWidth);
+            selectedElement.width = newWidth;
+            selectedElement.height = newHeight;
+          }
         } else if (resizeHandle === 'ne') {
-          selectedElement.width = Math.max(50, dragStart.elementWidth + dx);
+          const newWidth = Math.max(50, dragStart.elementWidth + dx);
           const newHeight = Math.max(30, dragStart.elementHeight - dy);
-          selectedElement.y = dragStart.elementY + (dragStart.elementHeight - newHeight);
-          selectedElement.height = newHeight;
+          
+          if (e.shiftKey) {
+            const size = Math.max(newWidth, newHeight);
+            selectedElement.width = size;
+            selectedElement.y = dragStart.elementY + (dragStart.elementHeight - size);
+            selectedElement.height = size;
+          } else {
+            selectedElement.width = newWidth;
+            selectedElement.y = dragStart.elementY + (dragStart.elementHeight - newHeight);
+            selectedElement.height = newHeight;
+          }
         } else if (resizeHandle === 'nw') {
           const newWidth = Math.max(50, dragStart.elementWidth - dx);
           const newHeight = Math.max(30, dragStart.elementHeight - dy);
-          selectedElement.x = dragStart.elementX + (dragStart.elementWidth - newWidth);
-          selectedElement.y = dragStart.elementY + (dragStart.elementHeight - newHeight);
-          selectedElement.width = newWidth;
-          selectedElement.height = newHeight;
+          
+          if (e.shiftKey) {
+            const size = Math.max(newWidth, newHeight);
+            selectedElement.x = dragStart.elementX + (dragStart.elementWidth - size);
+            selectedElement.y = dragStart.elementY + (dragStart.elementHeight - size);
+            selectedElement.width = size;
+            selectedElement.height = size;
+          } else {
+            selectedElement.x = dragStart.elementX + (dragStart.elementWidth - newWidth);
+            selectedElement.y = dragStart.elementY + (dragStart.elementHeight - newHeight);
+            selectedElement.width = newWidth;
+            selectedElement.height = newHeight;
+          }
+        }
+      } else if (selectedElement.type === 'circle') {
+        // Handle circle resizing
+        if (resizeHandle === 'n') {
+          const newRadius = Math.max(20, dragStart.elementY - currentY);
+          selectedElement.y = dragStart.elementY - newRadius;
+          selectedElement.radius = newRadius;
+        } else if (resizeHandle === 's') {
+          selectedElement.radius = Math.max(20, currentY - dragStart.elementY);
+        } else if (resizeHandle === 'e') {
+          selectedElement.radius = Math.max(20, currentX - dragStart.elementX);
+        } else if (resizeHandle === 'w') {
+          const newRadius = Math.max(20, dragStart.elementX - currentX);
+          selectedElement.x = dragStart.elementX - newRadius;
+          selectedElement.radius = newRadius;
         }
       } else if (selectedElement.type === 'line') {
         if (resizeHandle === 'start') {
@@ -470,52 +561,66 @@
 <svelte:window onmousemove={handleMouseMove} onmouseup={handleMouseUp} />
 
 <div class="builder-container">
+  <div class="left-panel">
   <div class="toolbar">
     <div class="tool-section">
       <h3>Tools</h3>
-      <button 
-        class="tool-btn"
-        class:active={tool === 'select'}
-        onclick={() => tool = 'select'}
-        title="Select (Esc)">
-        <svg width="20" height="20" viewBox="0 0 20 20">
-          <path d="M2 2 L2 18 L8 12 L12 18 L15 16 L11 10 L18 8 Z" fill="currentColor"/>
-        </svg>
-        Select
-      </button>
-      
-      <button 
-        class="tool-btn"
-        class:active={tool === 'box'}
-        onclick={() => tool = 'box'}
-        title="Add Box">
-        <svg width="20" height="20" viewBox="0 0 20 20">
-          <rect x="2" y="4" width="16" height="12" fill="none" stroke="currentColor" stroke-width="2"/>
-        </svg>
-        Box
-      </button>
-      
-      <button 
-        class="tool-btn"
-        class:active={tool === 'text'}
-        onclick={() => tool = 'text'}
-        title="Add Text">
-        <svg width="20" height="20" viewBox="0 0 20 20">
-          <text x="10" y="15" font-size="14" fill="currentColor" text-anchor="middle" font-weight="bold">T</text>
-        </svg>
-        Text
-      </button>
-      
-      <button 
-        class="tool-btn"
-        class:active={tool === 'line'}
-        onclick={() => tool = 'line'}
-        title="Add Line">
-        <svg width="20" height="20" viewBox="0 0 20 20">
-          <line x1="2" y1="10" x2="18" y2="10" stroke="currentColor" stroke-width="2"/>
-        </svg>
-        Line
-      </button>
+      <div class="tool-grid">
+        <button 
+          class="tool-btn"
+          class:active={tool === 'select'}
+          onclick={() => tool = 'select'}
+          title="Select (Esc)">
+          <svg width="20" height="20" viewBox="0 0 20 20">
+            <path d="M2 2 L2 18 L8 12 L12 18 L15 16 L11 10 L18 8 Z" fill="currentColor"/>
+          </svg>
+          <span>Select</span>
+        </button>
+        
+        <button 
+          class="tool-btn"
+          class:active={tool === 'box'}
+          onclick={() => tool = 'box'}
+          title="Add Box">
+          <svg width="20" height="20" viewBox="0 0 20 20">
+            <rect x="2" y="4" width="16" height="12" fill="none" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          <span>Box</span>
+        </button>
+        
+        <button 
+          class="tool-btn"
+          class:active={tool === 'circle'}
+          onclick={() => tool = 'circle'}
+          title="Add Circle">
+          <svg width="20" height="20" viewBox="0 0 20 20">
+            <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          <span>Circle</span>
+        </button>
+        
+        <button 
+          class="tool-btn"
+          class:active={tool === 'text'}
+          onclick={() => tool = 'text'}
+          title="Add Text">
+          <svg width="20" height="20" viewBox="0 0 20 20">
+            <text x="10" y="15" font-size="14" fill="currentColor" text-anchor="middle" font-weight="bold">T</text>
+          </svg>
+          <span>Text</span>
+        </button>
+        
+        <button 
+          class="tool-btn"
+          class:active={tool === 'line'}
+          onclick={() => tool = 'line'}
+          title="Add Line">
+          <svg width="20" height="20" viewBox="0 0 20 20">
+            <line x1="2" y1="10" x2="18" y2="10" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          <span>Line</span>
+        </button>
+      </div>
     </div>
     
     <div class="tool-section">
@@ -600,90 +705,7 @@
         Import JSON
       </button>
     </div>
-    
-    {#if selectedElement}
-      <div class="tool-section properties">
-        <h3>Properties</h3>
-        
-        {#if selectedElement.text !== undefined}
-          <div class="inline-edit-hint">
-            💡 Double-click element to edit text inline
-          </div>
-        {/if}
-        
-        {#if selectedElement.type === 'box'}
-          <label>
-            Width:
-            <input 
-              type="number" 
-              bind:value={selectedElement.width}
-              min="50"
-              max="500"
-            />
-          </label>
-          
-          <label>
-            Height:
-            <input 
-              type="number" 
-              bind:value={selectedElement.height}
-              min="30"
-              max="300"
-            />
-          </label>
-          
-          <label class="checkbox">
-            <input 
-              type="checkbox" 
-              bind:checked={selectedElement.shadow}
-            />
-            Drop Shadow
-          </label>
-          
-          <label class="checkbox">
-            <input 
-              type="checkbox" 
-              bind:checked={selectedElement.dashed}
-            />
-            Dashed Outline
-          </label>
-        {/if}
-        
-        {#if selectedElement.type === 'text'}
-          <label>
-            Font Size:
-            <input 
-              type="number" 
-              bind:value={selectedElement.fontSize}
-              min="8"
-              max="72"
-            />
-          </label>
-        {/if}
-        
-        {#if selectedElement.type === 'line'}
-          <div class="inline-edit-hint">
-            💡 Double-click line to add/edit label
-          </div>
-          
-          <label class="checkbox">
-            <input 
-              type="checkbox" 
-              bind:checked={selectedElement.hasCircle}
-            />
-            End Circle
-          </label>
-          
-          <label class="checkbox">
-            <input 
-              type="checkbox" 
-              bind:checked={selectedElement.hasArrow}
-            />
-            Arrow Head
-          </label>
-        {/if}
-      </div>
-    {/if}
+  </div>
   </div>
   
   <div 
@@ -732,7 +754,7 @@
               y={element.y} 
               width={element.width} 
               height={element.height} 
-              fill="#ffffff" 
+              fill={element.bgColor || '#ffffff'} 
               stroke="#000000" 
               stroke-width="2"
               stroke-dasharray={element.dashed ? "5,5" : "none"} />
@@ -763,10 +785,10 @@
                 x={element.x + element.width / 2} 
                 y={element.y + element.height / 2} 
                 font-family="ui-monospace, 'Courier New', monospace" 
-                font-size="12" 
+                font-size={element.fontSize || 12} 
                 text-anchor="middle" 
                 dominant-baseline="middle" 
-                fill="#000000"
+                fill={element.textColor || '#000000'}
                 pointer-events="none">
                 {element.text}
               </text>
@@ -817,6 +839,117 @@
                 stroke-width="1"
                 class="resize-handle"
                 onmousedown={(e) => handleResizeStart(e, element, 'se')} />
+            {/if}
+          </g>
+          
+        {:else if element.type === 'circle'}
+          <g 
+            class="element circle-element"
+            class:selected={selectedElement?.id === element.id}
+            onmousedown={(e) => handleMouseDown(e, element)}
+            onclick={(e) => handleElementClick(e, element)}
+            ondblclick={(e) => handleDoubleClick(e, element)}>
+            
+            {#if element.shadow}
+              <!-- Shadow -->
+              <circle 
+                cx={element.x + element.radius + 3} 
+                cy={element.y + element.radius + 3} 
+                r={element.radius} 
+                fill="#cccccc" 
+                stroke="none" />
+            {/if}
+            
+            <!-- Main circle -->
+            <circle 
+              cx={element.x + element.radius} 
+              cy={element.y + element.radius} 
+              r={element.radius} 
+              fill={element.bgColor || '#ffffff'} 
+              stroke="#000000" 
+              stroke-width="2"
+              stroke-dasharray={element.dashed ? "5,5" : "none"} />
+            
+            {#if editingText?.id === element.id}
+              <!-- Inline editing with foreignObject -->
+              <foreignObject 
+                x={element.x} 
+                y={element.y + element.radius - 15} 
+                width={element.radius * 2} 
+                height="30">
+                <input 
+                  id={`edit-${element.id}`}
+                  type="text" 
+                  bind:value={element.text}
+                  onblur={finishEditingText}
+                  onkeydown={(e) => {
+                    if (e.key === 'Enter') finishEditingText();
+                    if (e.key === 'Escape') finishEditingText();
+                    e.stopPropagation();
+                  }}
+                  class="inline-text-edit"
+                  style="width: 100%; height: 100%; text-align: center; font-family: ui-monospace, 'Courier New', monospace; font-size: 12px; border: 2px solid #ff5722; background: white;"
+                />
+              </foreignObject>
+            {:else}
+              <text 
+                x={element.x + element.radius} 
+                y={element.y + element.radius} 
+                font-family="ui-monospace, 'Courier New', monospace" 
+                font-size={element.fontSize || 12} 
+                text-anchor="middle" 
+                dominant-baseline="middle" 
+                fill={element.textColor || '#000000'}
+                pointer-events="none">
+                {element.text}
+              </text>
+            {/if}
+            
+            <!-- Resize handles (only when selected) -->
+            {#if selectedElement?.id === element.id}
+              <!-- Top handle -->
+              <circle 
+                cx={element.x + element.radius} 
+                cy={element.y} 
+                r="5" 
+                fill="#ff5722" 
+                stroke="#000000" 
+                stroke-width="1"
+                class="resize-handle"
+                onmousedown={(e) => handleResizeStart(e, element, 'n')} />
+              
+              <!-- Right handle -->
+              <circle 
+                cx={element.x + element.radius * 2} 
+                cy={element.y + element.radius} 
+                r="5" 
+                fill="#ff5722" 
+                stroke="#000000" 
+                stroke-width="1"
+                class="resize-handle"
+                onmousedown={(e) => handleResizeStart(e, element, 'e')} />
+              
+              <!-- Bottom handle -->
+              <circle 
+                cx={element.x + element.radius} 
+                cy={element.y + element.radius * 2} 
+                r="5" 
+                fill="#ff5722" 
+                stroke="#000000" 
+                stroke-width="1"
+                class="resize-handle"
+                onmousedown={(e) => handleResizeStart(e, element, 's')} />
+              
+              <!-- Left handle -->
+              <circle 
+                cx={element.x} 
+                cy={element.y + element.radius} 
+                r="5" 
+                fill="#ff5722" 
+                stroke="#000000" 
+                stroke-width="1"
+                class="resize-handle"
+                onmousedown={(e) => handleResizeStart(e, element, 'w')} />
             {/if}
           </g>
           
@@ -881,9 +1014,9 @@
             {:else if element.label && element.label !== ''}
               <text 
                 x={midX} 
-                y={midY - 1} 
+                y={midY - 4} 
                 font-family="ui-monospace, 'Courier New', monospace" 
-                font-size="11" 
+                font-size={element.labelSize || 11} 
                 text-anchor="middle" 
                 dominant-baseline="baseline" 
                 fill="#000000"
@@ -964,9 +1097,11 @@
     
     <div class="canvas-hint">
       {#if tool === 'select'}
-        Click: select • Drag: move • Double-click: edit text/add line label • Arrow keys: nudge 1px • Line endpoints snap to edges • Hold Shift: snap angles
+        Click: select • Drag: move • Double-click: edit text/add line label • Arrow keys: nudge 1px • Line snap to edges • Hold Shift: box→square / line→angle-snap
       {:else if tool === 'box'}
-        Click anywhere to add a box
+        Click anywhere to add a box • Hold Shift while resizing to force square
+      {:else if tool === 'circle'}
+        Click anywhere to add a circle
       {:else if tool === 'text'}
         Click anywhere to add text
       {:else if tool === 'line'}
@@ -974,6 +1109,257 @@
       {/if}
     </div>
   </div>
+  
+  {#if selectedElement}
+    <div class="properties-panel">
+      <h3>Properties</h3>
+      
+      {#if selectedElement.text !== undefined}
+        <div class="inline-edit-hint">
+          💡 Double-click to edit text inline
+        </div>
+      {/if}
+      
+      {#if selectedElement.type === 'box'}
+        <label>
+          Width:
+          <input 
+            type="number" 
+            bind:value={selectedElement.width}
+            min="50"
+            max="500"
+          />
+        </label>
+        
+        <label>
+          Height:
+          <input 
+            type="number" 
+            bind:value={selectedElement.height}
+            min="30"
+            max="300"
+          />
+        </label>
+        
+        <label>
+          Text Size:
+          <input 
+            type="number" 
+            bind:value={selectedElement.fontSize}
+            min="8"
+            max="48"
+          />
+        </label>
+        
+        <label>
+          Background:
+          <div class="color-buttons">
+            <button 
+              class="color-btn"
+              class:active={selectedElement.bgColor === '#000000'}
+              style="background: #000000; color: white;"
+              onclick={() => selectedElement.bgColor = '#000000'}>
+              Black
+            </button>
+            <button 
+              class="color-btn"
+              class:active={selectedElement.bgColor === '#ffffff'}
+              style="background: #ffffff; color: black; border: 1px solid #000;"
+              onclick={() => selectedElement.bgColor = '#ffffff'}>
+              White
+            </button>
+            <button 
+              class="color-btn"
+              class:active={selectedElement.bgColor === '#ff5722'}
+              style="background: #ff5722; color: white;"
+              onclick={() => selectedElement.bgColor = '#ff5722'}>
+              Orange
+            </button>
+          </div>
+        </label>
+        
+        <label>
+          Text Color:
+          <div class="color-buttons">
+            <button 
+              class="color-btn"
+              class:active={selectedElement.textColor === '#000000'}
+              style="background: #000000; color: white;"
+              onclick={() => selectedElement.textColor = '#000000'}>
+              Black
+            </button>
+            <button 
+              class="color-btn"
+              class:active={selectedElement.textColor === '#ffffff'}
+              style="background: #ffffff; color: black; border: 1px solid #000;"
+              onclick={() => selectedElement.textColor = '#ffffff'}>
+              White
+            </button>
+            <button 
+              class="color-btn"
+              class:active={selectedElement.textColor === '#ff5722'}
+              style="background: #ff5722; color: white;"
+              onclick={() => selectedElement.textColor = '#ff5722'}>
+              Orange
+            </button>
+          </div>
+        </label>
+        
+        <label class="checkbox">
+          <input 
+            type="checkbox" 
+            bind:checked={selectedElement.shadow}
+          />
+          Drop Shadow
+        </label>
+        
+        <label class="checkbox">
+          <input 
+            type="checkbox" 
+            bind:checked={selectedElement.dashed}
+          />
+          Dashed Outline
+        </label>
+      {/if}
+      
+      {#if selectedElement.type === 'circle'}
+        <label>
+          Radius:
+          <input 
+            type="number" 
+            bind:value={selectedElement.radius}
+            min="20"
+            max="200"
+          />
+        </label>
+        
+        <label>
+          Text Size:
+          <input 
+            type="number" 
+            bind:value={selectedElement.fontSize}
+            min="8"
+            max="48"
+          />
+        </label>
+        
+        <label>
+          Background:
+          <div class="color-buttons">
+            <button 
+              class="color-btn"
+              class:active={selectedElement.bgColor === '#000000'}
+              style="background: #000000; color: white;"
+              onclick={() => selectedElement.bgColor = '#000000'}>
+              Black
+            </button>
+            <button 
+              class="color-btn"
+              class:active={selectedElement.bgColor === '#ffffff'}
+              style="background: #ffffff; color: black; border: 1px solid #000;"
+              onclick={() => selectedElement.bgColor = '#ffffff'}>
+              White
+            </button>
+            <button 
+              class="color-btn"
+              class:active={selectedElement.bgColor === '#ff5722'}
+              style="background: #ff5722; color: white;"
+              onclick={() => selectedElement.bgColor = '#ff5722'}>
+              Orange
+            </button>
+          </div>
+        </label>
+        
+        <label>
+          Text Color:
+          <div class="color-buttons">
+            <button 
+              class="color-btn"
+              class:active={selectedElement.textColor === '#000000'}
+              style="background: #000000; color: white;"
+              onclick={() => selectedElement.textColor = '#000000'}>
+              Black
+            </button>
+            <button 
+              class="color-btn"
+              class:active={selectedElement.textColor === '#ffffff'}
+              style="background: #ffffff; color: black; border: 1px solid #000;"
+              onclick={() => selectedElement.textColor = '#ffffff'}>
+              White
+            </button>
+            <button 
+              class="color-btn"
+              class:active={selectedElement.textColor === '#ff5722'}
+              style="background: #ff5722; color: white;"
+              onclick={() => selectedElement.textColor = '#ff5722'}>
+              Orange
+            </button>
+          </div>
+        </label>
+        
+        <label class="checkbox">
+          <input 
+            type="checkbox" 
+            bind:checked={selectedElement.shadow}
+          />
+          Drop Shadow
+        </label>
+        
+        <label class="checkbox">
+          <input 
+            type="checkbox" 
+            bind:checked={selectedElement.dashed}
+          />
+          Dashed Outline
+        </label>
+      {/if}
+      
+      {#if selectedElement.type === 'text'}
+        <label>
+          Font Size:
+          <input 
+            type="number" 
+            bind:value={selectedElement.fontSize}
+            min="8"
+            max="72"
+          />
+        </label>
+      {/if}
+      
+      {#if selectedElement.type === 'line'}
+        <div class="inline-edit-hint">
+          💡 Double-click line to add label
+        </div>
+        
+        <label>
+          Label Size:
+          <input 
+            type="number" 
+            bind:value={selectedElement.labelSize}
+            min="8"
+            max="24"
+            placeholder="11"
+          />
+        </label>
+        
+        <label class="checkbox">
+          <input 
+            type="checkbox" 
+            bind:checked={selectedElement.hasCircle}
+          />
+          End Circle
+        </label>
+        
+        <label class="checkbox">
+          <input 
+            type="checkbox" 
+            bind:checked={selectedElement.hasArrow}
+          />
+          Arrow Head
+        </label>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -985,6 +1371,11 @@
     border: 2px solid #000000;
   }
   
+  .left-panel {
+    display: flex;
+    flex-direction: column;
+  }
+  
   .toolbar {
     width: 220px;
     background: #ffffff;
@@ -994,6 +1385,86 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
+  }
+  
+  .properties-panel {
+    width: 220px;
+    background: #ffffff;
+    border-left: 2px solid #000000;
+    padding: 16px;
+    overflow-y: auto;
+  }
+  
+  .properties-panel h3 {
+    font-size: 12px;
+    font-weight: 400;
+    margin: 0 0 16px 0;
+    color: #666666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-family: ui-monospace, 'Courier New', monospace;
+  }
+  
+  .properties-panel label {
+    display: block;
+    margin-bottom: 12px;
+    font-size: 11px;
+    color: #333333;
+    font-family: ui-monospace, 'Courier New', monospace;
+  }
+  
+  .properties-panel input[type="text"],
+  .properties-panel input[type="number"] {
+    width: 100%;
+    padding: 6px 8px;
+    margin-top: 4px;
+    border: 1px solid #000000;
+    background: #ffffff;
+    font-family: ui-monospace, 'Courier New', monospace;
+    font-size: 11px;
+  }
+  
+  .properties-panel input[type="text"]:focus,
+  .properties-panel input[type="number"]:focus {
+    outline: 2px solid #ff5722;
+    outline-offset: 0;
+  }
+  
+  .properties-panel .checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .properties-panel .checkbox input {
+    width: auto;
+    margin: 0;
+  }
+  
+  .color-buttons {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+  }
+  
+  .color-btn {
+    flex: 1;
+    padding: 6px 4px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    font-family: ui-monospace, 'Courier New', monospace;
+    font-size: 9px;
+    font-weight: 400;
+    transition: all 0.2s ease;
+  }
+  
+  .color-btn:hover {
+    opacity: 0.8;
+  }
+  
+  .color-btn.active {
+    border-color: #ff5722;
+    box-shadow: 0 0 0 2px #ff5722;
   }
   
   .tool-section {
@@ -1015,21 +1486,32 @@
     font-family: ui-monospace, 'Courier New', monospace;
   }
   
+  .tool-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+  }
+  
   .tool-btn {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 10px 12px;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 4px;
     background: #ffffff;
     border: 2px solid #000000;
     cursor: pointer;
     font-family: ui-monospace, 'Courier New', monospace;
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 400;
     color: #000000;
-    margin-bottom: 8px;
     transition: all 0.2s ease;
+  }
+  
+  .tool-btn span {
+    display: block;
+    white-space: nowrap;
   }
   
   .tool-btn:hover {
@@ -1069,42 +1551,6 @@
   .action-btn:disabled {
     opacity: 0.3;
     cursor: not-allowed;
-  }
-  
-  .properties label {
-    display: block;
-    margin-bottom: 12px;
-    font-size: 11px;
-    color: #333333;
-    font-family: ui-monospace, 'Courier New', monospace;
-  }
-  
-  .properties input[type="text"],
-  .properties input[type="number"] {
-    width: 100%;
-    padding: 6px 8px;
-    margin-top: 4px;
-    border: 1px solid #000000;
-    background: #ffffff;
-    font-family: ui-monospace, 'Courier New', monospace;
-    font-size: 11px;
-  }
-  
-  .properties input[type="text"]:focus,
-  .properties input[type="number"]:focus {
-    outline: 2px solid #ff5722;
-    outline-offset: 0;
-  }
-  
-  .properties .checkbox {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  
-  .properties .checkbox input {
-    width: auto;
-    margin: 0;
   }
   
   .filename-input {
