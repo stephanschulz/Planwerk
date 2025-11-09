@@ -369,8 +369,18 @@
       // Handle resizing
       if (selectedElement.type === 'box') {
         if (resizeHandle === 'se') {
-          const newWidth = Math.max(50, dragStart.elementWidth + dx);
-          const newHeight = Math.max(30, dragStart.elementHeight + dy);
+          let cornerX = dragStart.elementX + dragStart.elementWidth + dx;
+          let cornerY = dragStart.elementY + dragStart.elementHeight + dy;
+          
+          // Apply grid snapping if 's' key is held
+          if (isSnapKeyPressed) {
+            const snapped = snapToGrid(cornerX, cornerY);
+            cornerX = snapped.x;
+            cornerY = snapped.y;
+          }
+          
+          const newWidth = Math.max(50, cornerX - dragStart.elementX);
+          const newHeight = Math.max(30, cornerY - dragStart.elementY);
           
           if (e.shiftKey) {
             // Force square by using the larger dimension
@@ -382,65 +392,106 @@
             selectedElement.height = newHeight;
           }
         } else if (resizeHandle === 'sw') {
-          const newWidth = Math.max(50, dragStart.elementWidth - dx);
-          const newHeight = Math.max(30, dragStart.elementHeight + dy);
+          let cornerX = dragStart.elementX + dx;
+          let cornerY = dragStart.elementY + dragStart.elementHeight + dy;
+          
+          // Apply grid snapping if 's' key is held
+          if (isSnapKeyPressed) {
+            const snapped = snapToGrid(cornerX, cornerY);
+            cornerX = snapped.x;
+            cornerY = snapped.y;
+          }
+          
+          const newWidth = Math.max(50, dragStart.elementX + dragStart.elementWidth - cornerX);
+          const newHeight = Math.max(30, cornerY - dragStart.elementY);
           
           if (e.shiftKey) {
             const size = Math.max(newWidth, newHeight);
-            selectedElement.x = dragStart.elementX + (dragStart.elementWidth - size);
+            selectedElement.x = dragStart.elementX + dragStart.elementWidth - size;
             selectedElement.width = size;
             selectedElement.height = size;
           } else {
-            selectedElement.x = dragStart.elementX + (dragStart.elementWidth - newWidth);
+            selectedElement.x = dragStart.elementX + dragStart.elementWidth - newWidth;
             selectedElement.width = newWidth;
             selectedElement.height = newHeight;
           }
         } else if (resizeHandle === 'ne') {
-          const newWidth = Math.max(50, dragStart.elementWidth + dx);
-          const newHeight = Math.max(30, dragStart.elementHeight - dy);
+          let cornerX = dragStart.elementX + dragStart.elementWidth + dx;
+          let cornerY = dragStart.elementY + dy;
+          
+          // Apply grid snapping if 's' key is held
+          if (isSnapKeyPressed) {
+            const snapped = snapToGrid(cornerX, cornerY);
+            cornerX = snapped.x;
+            cornerY = snapped.y;
+          }
+          
+          const newWidth = Math.max(50, cornerX - dragStart.elementX);
+          const newHeight = Math.max(30, dragStart.elementY + dragStart.elementHeight - cornerY);
           
           if (e.shiftKey) {
             const size = Math.max(newWidth, newHeight);
             selectedElement.width = size;
-            selectedElement.y = dragStart.elementY + (dragStart.elementHeight - size);
+            selectedElement.y = dragStart.elementY + dragStart.elementHeight - size;
             selectedElement.height = size;
           } else {
             selectedElement.width = newWidth;
-            selectedElement.y = dragStart.elementY + (dragStart.elementHeight - newHeight);
+            selectedElement.y = dragStart.elementY + dragStart.elementHeight - newHeight;
             selectedElement.height = newHeight;
           }
         } else if (resizeHandle === 'nw') {
-          const newWidth = Math.max(50, dragStart.elementWidth - dx);
-          const newHeight = Math.max(30, dragStart.elementHeight - dy);
+          let cornerX = dragStart.elementX + dx;
+          let cornerY = dragStart.elementY + dy;
+          
+          // Apply grid snapping if 's' key is held
+          if (isSnapKeyPressed) {
+            const snapped = snapToGrid(cornerX, cornerY);
+            cornerX = snapped.x;
+            cornerY = snapped.y;
+          }
+          
+          const newWidth = Math.max(50, dragStart.elementX + dragStart.elementWidth - cornerX);
+          const newHeight = Math.max(30, dragStart.elementY + dragStart.elementHeight - cornerY);
           
           if (e.shiftKey) {
             const size = Math.max(newWidth, newHeight);
-            selectedElement.x = dragStart.elementX + (dragStart.elementWidth - size);
-            selectedElement.y = dragStart.elementY + (dragStart.elementHeight - size);
+            selectedElement.x = dragStart.elementX + dragStart.elementWidth - size;
+            selectedElement.y = dragStart.elementY + dragStart.elementHeight - size;
             selectedElement.width = size;
             selectedElement.height = size;
           } else {
-            selectedElement.x = dragStart.elementX + (dragStart.elementWidth - newWidth);
-            selectedElement.y = dragStart.elementY + (dragStart.elementHeight - newHeight);
+            selectedElement.x = dragStart.elementX + dragStart.elementWidth - newWidth;
+            selectedElement.y = dragStart.elementY + dragStart.elementHeight - newHeight;
             selectedElement.width = newWidth;
             selectedElement.height = newHeight;
           }
         }
       } else if (selectedElement.type === 'circle') {
-        // Handle circle resizing
-        if (resizeHandle === 'n') {
-          const newRadius = Math.max(20, dragStart.elementY - currentY);
-          selectedElement.y = dragStart.elementY - newRadius;
-          selectedElement.radius = newRadius;
-        } else if (resizeHandle === 's') {
-          selectedElement.radius = Math.max(20, currentY - dragStart.elementY);
-        } else if (resizeHandle === 'e') {
-          selectedElement.radius = Math.max(20, currentX - dragStart.elementX);
-        } else if (resizeHandle === 'w') {
-          const newRadius = Math.max(20, dragStart.elementX - currentX);
-          selectedElement.x = dragStart.elementX - newRadius;
-          selectedElement.radius = newRadius;
+        // Handle circle resizing - always resize from center
+        // Circle center stays fixed at (centerX, centerY)
+        const centerX = dragStart.elementX + dragStart.elementRadius;
+        const centerY = dragStart.elementY + dragStart.elementRadius;
+        
+        // Calculate new radius based on distance from center to mouse position
+        const distanceX = currentX - centerX;
+        const distanceY = currentY - centerY;
+        const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+        let newRadius = Math.max(20, distance);
+        
+        // Apply grid snapping if 's' key is held
+        if (isSnapKeyPressed) {
+          // Snap the handle position to grid and recalculate radius
+          const snapPoint = snapToGrid(currentX, currentY);
+          const snappedDistanceX = snapPoint.x - centerX;
+          const snappedDistanceY = snapPoint.y - centerY;
+          const snappedDistance = Math.sqrt(snappedDistanceX * snappedDistanceX + snappedDistanceY * snappedDistanceY);
+          newRadius = Math.max(20, snappedDistance);
         }
+        
+        // Update circle to maintain center position
+        selectedElement.radius = newRadius;
+        selectedElement.x = centerX - newRadius;
+        selectedElement.y = centerY - newRadius;
       } else if (selectedElement.type === 'line') {
         if (resizeHandle === 'start') {
           // Check for snap points
@@ -1246,20 +1297,9 @@
               </text>
             {/if}
             
-            <!-- Resize handles (only when selected) -->
+            <!-- Resize handle (only when selected) -->
             {#if selectedElement?.id === element.id}
-              <!-- Top handle -->
-              <circle 
-                cx={element.x + element.radius} 
-                cy={element.y} 
-                r="5" 
-                fill="#ff5722" 
-                stroke="#000000" 
-                stroke-width="1"
-                class="resize-handle"
-                onmousedown={(e) => handleResizeStart(e, element, 'n')} />
-              
-              <!-- Right handle -->
+              <!-- Single resize handle at east (right) position -->
               <circle 
                 cx={element.x + element.radius * 2} 
                 cy={element.y + element.radius} 
@@ -1269,28 +1309,6 @@
                 stroke-width="1"
                 class="resize-handle"
                 onmousedown={(e) => handleResizeStart(e, element, 'e')} />
-              
-              <!-- Bottom handle -->
-              <circle 
-                cx={element.x + element.radius} 
-                cy={element.y + element.radius * 2} 
-                r="5" 
-                fill="#ff5722" 
-                stroke="#000000" 
-                stroke-width="1"
-                class="resize-handle"
-                onmousedown={(e) => handleResizeStart(e, element, 's')} />
-              
-              <!-- Left handle -->
-              <circle 
-                cx={element.x} 
-                cy={element.y + element.radius} 
-                r="5" 
-                fill="#ff5722" 
-                stroke="#000000" 
-                stroke-width="1"
-                class="resize-handle"
-                onmousedown={(e) => handleResizeStart(e, element, 'w')} />
             {/if}
           </g>
           
@@ -1440,11 +1458,11 @@
     
     <div class="canvas-hint">
       {#if tool === 'select'}
-        Click: select • Ctrl/Cmd+Click: multi-select • Drag: move • Arrow keys: nudge 1px • Ctrl/Cmd+C: copy • Ctrl/Cmd+V: paste • Hold S: snap to grid • Hold Shift: box→square / line→angle-snap • Double-click: edit text
+        Click: select • Ctrl/Cmd+Click: multi-select • Drag: move • Arrow keys: nudge 1px • Ctrl/Cmd+C: copy • Ctrl/Cmd+V: paste • Hold S: snap to grid (move/resize) • Hold Shift: box→square / line→angle-snap • Double-click: edit text
       {:else if tool === 'box'}
-        Click anywhere to add a box • Hold Shift while resizing to force square • Hold S while dragging to snap to grid • When editing: Enter creates line break
+        Click anywhere to add a box • Hold Shift while resizing to force square • Hold S while dragging/resizing to snap to grid • When editing: Enter creates line break
       {:else if tool === 'circle'}
-        Click anywhere to add a circle • Hold S while dragging to snap to grid • When editing: Enter creates line break
+        Click anywhere to add a circle • Hold S while dragging/resizing to snap to grid • When editing: Enter creates line break
       {:else if tool === 'text'}
         Click anywhere to add text • Hold S while dragging to snap to grid • When editing: Enter creates line break
       {:else if tool === 'line'}
