@@ -329,14 +329,14 @@
   }
   
   // Helper function to find snap points near a coordinate
-  function findSnapPoint(x, y, excludeElementId) {
+  function findSnapPoint(x, y, excludeElementId, otherEndX = null, otherEndY = null) {
     const snapDistance = 10; // pixels
     
     for (const el of elements) {
       if (el.id === excludeElementId) continue;
       
       if (el.type === 'box') {
-        // Check box edges
+        // Check box edges (corners and centers)
         const edges = [
           { x: el.x, y: el.y }, // top-left
           { x: el.x + el.width, y: el.y }, // top-right
@@ -352,6 +352,44 @@
           const dist = Math.sqrt(Math.pow(x - edge.x, 2) + Math.pow(y - edge.y, 2));
           if (dist < snapDistance) {
             return edge;
+          }
+        }
+        
+        // If other end of line is specified, also check for edge alignment
+        if (otherEndX !== null && otherEndY !== null) {
+          // Check for points on box edges that align with the other end (for orthogonal lines)
+          const alignmentPoints = [];
+          
+          // Top edge - check if we can align Y with other end
+          if (Math.abs(y - el.y) < snapDistance) {
+            alignmentPoints.push({ x: otherEndX, y: el.y });
+          }
+          
+          // Bottom edge - check if we can align Y with other end
+          if (Math.abs(y - (el.y + el.height)) < snapDistance) {
+            alignmentPoints.push({ x: otherEndX, y: el.y + el.height });
+          }
+          
+          // Left edge - check if we can align X with other end
+          if (Math.abs(x - el.x) < snapDistance) {
+            alignmentPoints.push({ x: el.x, y: otherEndY });
+          }
+          
+          // Right edge - check if we can align X with other end
+          if (Math.abs(x - (el.x + el.width)) < snapDistance) {
+            alignmentPoints.push({ x: el.x + el.width, y: otherEndY });
+          }
+          
+          // Return the closest alignment point
+          for (const point of alignmentPoints) {
+            // Check if this point is within the box bounds
+            if (point.x >= el.x && point.x <= el.x + el.width &&
+                point.y >= el.y && point.y <= el.y + el.height) {
+              const dist = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(y - point.y, 2));
+              if (dist < snapDistance * 2) { // Slightly larger tolerance for edge alignment
+                return point;
+              }
+            }
           }
         }
       } else if (el.type === 'circle') {
@@ -525,8 +563,8 @@
             cornerY = snapped.y;
           }
           
-          const newWidth = Math.max(50, cornerX - dragStart.elementX);
-          const newHeight = Math.max(30, cornerY - dragStart.elementY);
+          const newWidth = Math.max(20, cornerX - dragStart.elementX);
+          const newHeight = Math.max(20, cornerY - dragStart.elementY);
           
           if (e.shiftKey) {
             // Force square by using the larger dimension
@@ -548,8 +586,8 @@
             cornerY = snapped.y;
           }
           
-          const newWidth = Math.max(50, dragStart.elementX + dragStart.elementWidth - cornerX);
-          const newHeight = Math.max(30, cornerY - dragStart.elementY);
+          const newWidth = Math.max(20, dragStart.elementX + dragStart.elementWidth - cornerX);
+          const newHeight = Math.max(20, cornerY - dragStart.elementY);
           
           if (e.shiftKey) {
             const size = Math.max(newWidth, newHeight);
@@ -572,8 +610,8 @@
             cornerY = snapped.y;
           }
           
-          const newWidth = Math.max(50, cornerX - dragStart.elementX);
-          const newHeight = Math.max(30, dragStart.elementY + dragStart.elementHeight - cornerY);
+          const newWidth = Math.max(20, cornerX - dragStart.elementX);
+          const newHeight = Math.max(20, dragStart.elementY + dragStart.elementHeight - cornerY);
           
           if (e.shiftKey) {
             const size = Math.max(newWidth, newHeight);
@@ -596,8 +634,8 @@
             cornerY = snapped.y;
           }
           
-          const newWidth = Math.max(50, dragStart.elementX + dragStart.elementWidth - cornerX);
-          const newHeight = Math.max(30, dragStart.elementY + dragStart.elementHeight - cornerY);
+          const newWidth = Math.max(20, dragStart.elementX + dragStart.elementWidth - cornerX);
+          const newHeight = Math.max(20, dragStart.elementY + dragStart.elementHeight - cornerY);
           
           if (e.shiftKey) {
             const size = Math.max(newWidth, newHeight);
@@ -622,7 +660,7 @@
         const distanceX = currentX - centerX;
         const distanceY = currentY - centerY;
         const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
-        let newRadius = Math.max(20, distance);
+        let newRadius = Math.max(10, distance);
         
         // Apply grid snapping if 's' key is held
         if (isSnapKeyPressed) {
@@ -631,7 +669,7 @@
           const snappedDistanceX = snapPoint.x - centerX;
           const snappedDistanceY = snapPoint.y - centerY;
           const snappedDistance = Math.sqrt(snappedDistanceX * snappedDistanceX + snappedDistanceY * snappedDistanceY);
-          newRadius = Math.max(20, snappedDistance);
+          newRadius = Math.max(10, snappedDistance);
         }
         
         // Update circle to maintain center position
@@ -640,8 +678,8 @@
         selectedElement.y = centerY - newRadius;
       } else if (selectedElement.type === 'line') {
         if (resizeHandle === 'start') {
-          // Check for snap points
-          const snapPoint = findSnapPoint(currentX, currentY, selectedElement.id);
+          // Check for snap points, passing the other end's coordinates for edge alignment
+          const snapPoint = findSnapPoint(currentX, currentY, selectedElement.id, selectedElement.x2, selectedElement.y2);
           let finalX = snapPoint ? snapPoint.x : currentX;
           let finalY = snapPoint ? snapPoint.y : currentY;
           
@@ -652,13 +690,21 @@
             finalY = snapped.y;
           }
           
+          // Ensure minimum line length of 10 pixels
+          const distance = Math.sqrt(Math.pow(finalX - selectedElement.x2, 2) + Math.pow(finalY - selectedElement.y2, 2));
+          if (distance < 10) {
+            const angle = Math.atan2(finalY - selectedElement.y2, finalX - selectedElement.x2);
+            finalX = selectedElement.x2 + 10 * Math.cos(angle);
+            finalY = selectedElement.y2 + 10 * Math.sin(angle);
+          }
+          
           if (e.shiftKey) {
             // Snap to 15-degree intervals relative to the other end
             const angle = Math.atan2(finalY - selectedElement.y2, finalX - selectedElement.x2);
             const snapAngle = Math.round(angle / (Math.PI / 12)) * (Math.PI / 12); // 15 degrees = PI/12
-            const distance = Math.sqrt(Math.pow(finalX - selectedElement.x2, 2) + Math.pow(finalY - selectedElement.y2, 2));
-            selectedElement.x1 = selectedElement.x2 + distance * Math.cos(snapAngle);
-            selectedElement.y1 = selectedElement.y2 + distance * Math.sin(snapAngle);
+            const dist = Math.max(10, Math.sqrt(Math.pow(finalX - selectedElement.x2, 2) + Math.pow(finalY - selectedElement.y2, 2)));
+            selectedElement.x1 = selectedElement.x2 + dist * Math.cos(snapAngle);
+            selectedElement.y1 = selectedElement.y2 + dist * Math.sin(snapAngle);
           } else {
             selectedElement.x1 = finalX;
             selectedElement.y1 = finalY;
@@ -673,8 +719,8 @@
             }
           }
         } else if (resizeHandle === 'end') {
-          // Check for snap points
-          const snapPoint = findSnapPoint(currentX, currentY, selectedElement.id);
+          // Check for snap points, passing the other end's coordinates for edge alignment
+          const snapPoint = findSnapPoint(currentX, currentY, selectedElement.id, selectedElement.x1, selectedElement.y1);
           let finalX = snapPoint ? snapPoint.x : currentX;
           let finalY = snapPoint ? snapPoint.y : currentY;
           
@@ -693,13 +739,21 @@
             finalY = snapped.y;
           }
           
+          // Ensure minimum line length of 10 pixels
+          const distance = Math.sqrt(Math.pow(finalX - selectedElement.x1, 2) + Math.pow(finalY - selectedElement.y1, 2));
+          if (distance < 10) {
+            const angle = Math.atan2(finalY - selectedElement.y1, finalX - selectedElement.x1);
+            finalX = selectedElement.x1 + 10 * Math.cos(angle);
+            finalY = selectedElement.y1 + 10 * Math.sin(angle);
+          }
+          
           if (e.shiftKey) {
             // Snap to 15-degree intervals relative to the start
             const angle = Math.atan2(finalY - selectedElement.y1, finalX - selectedElement.x1);
             const snapAngle = Math.round(angle / (Math.PI / 12)) * (Math.PI / 12); // 15 degrees = PI/12
-            const distance = Math.sqrt(Math.pow(finalX - selectedElement.x1, 2) + Math.pow(finalY - selectedElement.y1, 2));
-            selectedElement.x2 = selectedElement.x1 + distance * Math.cos(snapAngle);
-            selectedElement.y2 = selectedElement.y1 + distance * Math.sin(snapAngle);
+            const dist = Math.max(10, Math.sqrt(Math.pow(finalX - selectedElement.x1, 2) + Math.pow(finalY - selectedElement.y1, 2)));
+            selectedElement.x2 = selectedElement.x1 + dist * Math.cos(snapAngle);
+            selectedElement.y2 = selectedElement.y1 + dist * Math.sin(snapAngle);
           } else {
             selectedElement.x2 = finalX;
             selectedElement.y2 = finalY;
@@ -1783,8 +1837,9 @@
           <input 
             type="number" 
             bind:value={selectedElement.width}
-            min="50"
+            min="20"
             max="500"
+            onchange={() => selectedElement.width = Math.max(20, selectedElement.width)}
           />
         </label>
         
@@ -1793,8 +1848,9 @@
           <input 
             type="number" 
             bind:value={selectedElement.height}
-            min="30"
+            min="20"
             max="300"
+            onchange={() => selectedElement.height = Math.max(20, selectedElement.height)}
           />
         </label>
         
@@ -1900,8 +1956,9 @@
           <input 
             type="number" 
             bind:value={selectedElement.radius}
-            min="20"
+            min="10"
             max="200"
+            onchange={() => selectedElement.radius = Math.max(10, selectedElement.radius)}
           />
         </label>
         
