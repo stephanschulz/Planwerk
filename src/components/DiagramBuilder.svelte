@@ -708,9 +708,9 @@
         }
         
         // Update circle to maintain center position
-        selectedElement.radius = newRadius;
-        selectedElement.x = centerX - newRadius;
-        selectedElement.y = centerY - newRadius;
+        selectedElement.radius = Math.round(newRadius);
+        selectedElement.x = centerX - Math.round(newRadius);
+        selectedElement.y = centerY - Math.round(newRadius);
       } else if (selectedElement.type === 'line') {
         if (resizeHandle === 'start') {
           // Check for snap points, passing the other end's coordinates for edge alignment
@@ -2024,7 +2024,7 @@
             bind:value={selectedElement.radius}
             min="10"
             max="200"
-            onchange={() => selectedElement.radius = Math.max(10, selectedElement.radius)}
+            onchange={() => selectedElement.radius = Math.max(10, Math.round(selectedElement.radius))}
           />
         </label>
         
