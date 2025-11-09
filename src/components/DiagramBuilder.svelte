@@ -28,6 +28,10 @@
   let showAboutModal = $state(false);
   let showHint = $state(true);
   let hintTimeout = null;
+  let isMKeyPressed = $state(false);
+  let selectionRect = $state(null); // { startX, startY, endX, endY } in canvas coordinates
+  let isDrawingSelection = $state(false);
+  let justFinishedSelection = $state(false);
   
   // Template for new elements
   function createBox(x, y) {
@@ -153,11 +157,26 @@
       e.preventDefault();
       return;
     }
+    
+    // Check if 'm' key is pressed for multi-select area
+    if (isMKeyPressed && tool === 'select') {
+      isDrawingSelection = true;
+      const { x, y } = screenToCanvas(e.clientX, e.clientY);
+      selectionRect = { startX: x, startY: y, endX: x, endY: y };
+      e.preventDefault();
+      return;
+    }
   }
   
   function handleCanvasClick(e) {
     // Don't place elements if we're panning
     if (isPanning) {
+      return;
+    }
+    
+    // Don't clear selection if we just finished a selection rectangle
+    if (justFinishedSelection) {
+      justFinishedSelection = false;
       return;
     }
     
@@ -447,6 +466,14 @@
     if (isPanning) {
       panX = e.clientX - panStartX;
       panY = e.clientY - panStartY;
+      return;
+    }
+    
+    // Handle drawing selection rectangle
+    if (isDrawingSelection && selectionRect) {
+      const { x, y } = screenToCanvas(e.clientX, e.clientY);
+      selectionRect.endX = x;
+      selectionRect.endY = y;
       return;
     }
     
@@ -750,6 +777,51 @@
   }
   
   function handleMouseUp() {
+    // Handle finishing selection rectangle
+    if (isDrawingSelection && selectionRect) {
+      const minX = Math.min(selectionRect.startX, selectionRect.endX);
+      const maxX = Math.max(selectionRect.startX, selectionRect.endX);
+      const minY = Math.min(selectionRect.startY, selectionRect.endY);
+      const maxY = Math.max(selectionRect.startY, selectionRect.endY);
+      
+      // Select all elements that are fully or partially within the selection rectangle
+      const selectedInRect = elements.filter(element => {
+        if (element.type === 'box') {
+          // Check if box intersects with selection rectangle
+          return !(element.x + element.width < minX || 
+                   element.x > maxX || 
+                   element.y + element.height < minY || 
+                   element.y > maxY);
+        } else if (element.type === 'circle') {
+          const cx = element.x + element.radius;
+          const cy = element.y + element.radius;
+          // Check if circle center is in rectangle or if circle intersects rectangle
+          const closestX = Math.max(minX, Math.min(cx, maxX));
+          const closestY = Math.max(minY, Math.min(cy, maxY));
+          const distanceSquared = (cx - closestX) ** 2 + (cy - closestY) ** 2;
+          return distanceSquared <= element.radius ** 2;
+        } else if (element.type === 'line') {
+          // Check if either endpoint is within the rectangle
+          return (element.x1 >= minX && element.x1 <= maxX && element.y1 >= minY && element.y1 <= maxY) ||
+                 (element.x2 >= minX && element.x2 <= maxX && element.y2 >= minY && element.y2 <= maxY);
+        } else if (element.type === 'text') {
+          // Check if text position is within rectangle
+          return element.x >= minX && element.x <= maxX && element.y >= minY && element.y <= maxY;
+        }
+        return false;
+      });
+      
+      if (selectedInRect.length > 0) {
+        selectedElements = selectedInRect;
+        selectedElement = selectedInRect[0];
+      }
+      
+      isDrawingSelection = false;
+      selectionRect = null;
+      justFinishedSelection = true; // Prevent canvas click from clearing selection
+      return;
+    }
+    
     isDragging = false;
     isResizing = false;
     resizeHandle = null;
@@ -806,6 +878,11 @@
     // Track 's' key for snap-to-grid
     if (e.key === 's' || e.key === 'S') {
       isSnapKeyPressed = true;
+    }
+    
+    // Track 'm' key for multi-select mode
+    if (e.key === 'm' || e.key === 'M') {
+      isMKeyPressed = true;
     }
     
     // Track space key for panning (but don't pan if editing text)
@@ -882,6 +959,16 @@
     // Track 's' key release for snap-to-grid
     if (e.key === 's' || e.key === 'S') {
       isSnapKeyPressed = false;
+    }
+    
+    // Track 'm' key release for multi-select mode
+    if (e.key === 'm' || e.key === 'M') {
+      isMKeyPressed = false;
+      // Cancel any ongoing selection
+      if (isDrawingSelection) {
+        isDrawingSelection = false;
+        selectionRect = null;
+      }
     }
     
     // Track space key release for panning
@@ -1225,6 +1312,7 @@
     class="canvas"
     class:space-pressed={isSpacePressed && !isPanning}
     class:panning={isPanning}
+    class:m-key-pressed={isMKeyPressed && tool === 'select'}
     bind:this={canvasElement}
     onclick={handleCanvasClick}
     onmousedown={handleCanvasMouseDown}
@@ -1262,6 +1350,24 @@
       {/if}
       
       <g transform="translate({panX}, {panY}) scale({zoomLevel})">
+      <!-- Selection rectangle while drawing -->
+      {#if isDrawingSelection && selectionRect}
+        {@const minX = Math.min(selectionRect.startX, selectionRect.endX)}
+        {@const minY = Math.min(selectionRect.startY, selectionRect.endY)}
+        {@const width = Math.abs(selectionRect.endX - selectionRect.startX)}
+        {@const height = Math.abs(selectionRect.endY - selectionRect.startY)}
+        <rect 
+          x={minX} 
+          y={minY} 
+          width={width} 
+          height={height} 
+          fill="rgba(255, 87, 34, 0.1)" 
+          stroke="#ff5722" 
+          stroke-width="2"
+          stroke-dasharray="5,5"
+          pointer-events="none" />
+      {/if}
+      
       {#each elements as element (element.id)}
         {#if element.type === 'box'}
           <g 
@@ -1603,7 +1709,7 @@
     
     <div class="canvas-hint" class:fade-out={!showHint}>
       {#if tool === 'select'}
-        Click: select • Ctrl/Cmd+Click: multi-select • Drag: move • Arrow keys: nudge 1px • Ctrl/Cmd+C: copy • Ctrl/Cmd+V: paste • Hold S: snap to grid (move/resize) • Hold Shift: box→square / line→angle-snap • Double-click: edit text
+        Click: select • Ctrl/Cmd+Click: multi-select • Hold M + Drag: area select • Drag: move • Arrow keys: nudge 1px • Ctrl/Cmd+C: copy • Ctrl/Cmd+V: paste • Hold S: snap to grid (move/resize) • Hold Shift: box→square / line→angle-snap • Double-click: edit text
       {:else if tool === 'box'}
         Click anywhere to add a box • Hold Shift while resizing to force square • Hold S while dragging/resizing to snap to grid • When editing: Enter creates line break
       {:else if tool === 'circle'}
@@ -2195,6 +2301,10 @@
     cursor: grabbing !important;
   }
   
+  .canvas.m-key-pressed {
+    cursor: crosshair !important;
+  }
+  
   .diagram-svg {
     width: 100%;
     height: 100%;
@@ -2205,6 +2315,11 @@
   }
   
   .element.selected rect {
+    stroke: #ff5722;
+    stroke-width: 3;
+  }
+  
+  .element.selected circle {
     stroke: #ff5722;
     stroke-width: 3;
   }
