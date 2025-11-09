@@ -47,7 +47,8 @@
       dashed: false,
       fontSize: 12,
       bgColor: '#ffffff',
-      textColor: '#000000'
+      textColor: '#000000',
+      locked: false
     };
   }
   
@@ -63,7 +64,8 @@
       dashed: false,
       fontSize: 12,
       bgColor: '#ffffff',
-      textColor: '#000000'
+      textColor: '#000000',
+      locked: false
     };
   }
   
@@ -74,7 +76,8 @@
       x: x - 50,
       y: y - 10,
       text: 'Text Label',
-      fontSize: 14
+      fontSize: 14,
+      locked: false
     };
   }
   
@@ -88,7 +91,8 @@
       y2: y2 || y1,
       hasCircle: false,
       hasArrow: false,
-      label: ''
+      label: '',
+      locked: false
     };
   }
   
@@ -409,6 +413,11 @@
       return;
     }
     
+    // Don't start dragging if element is locked
+    if (element.locked) {
+      return;
+    }
+    
     e.stopPropagation();
     
     // If clicked element is not in selection, select it (unless multi-selecting)
@@ -421,14 +430,16 @@
     
     const { x, y } = screenToCanvas(e.clientX, e.clientY);
     
-    // Store initial positions for all selected elements
-    const elementsData = selectedElements.map(el => ({
-      element: el,
-      startX: el.x || el.x1,
-      startY: el.y || el.y1,
-      startX2: el.x2,
-      startY2: el.y2
-    }));
+    // Store initial positions for all selected elements (excluding locked ones)
+    const elementsData = selectedElements
+      .filter(el => !el.locked)
+      .map(el => ({
+        element: el,
+        startX: el.x || el.x1,
+        startY: el.y || el.y1,
+        startX2: el.x2,
+        startY2: el.y2
+      }));
     
     dragStart = {
       x: x,
@@ -446,6 +457,12 @@
   
   function handleResizeStart(e, element, handle) {
     e.stopPropagation();
+    
+    // Don't allow resizing if element is locked
+    if (element.locked) {
+      return;
+    }
+    
     selectedElement = element;
     isResizing = true;
     resizeHandle = handle;
@@ -935,6 +952,11 @@
       e.preventDefault();
       
       for (const element of selectedElements) {
+        // Skip locked elements
+        if (element.locked) {
+          continue;
+        }
+        
         if (e.key === 'ArrowUp') {
           if (element.type === 'line') {
             element.y1 -= 1;
@@ -1372,8 +1394,8 @@
             onclick={(e) => handleElementClick(e, element)}
             ondblclick={(e) => handleDoubleClick(e, element)}>
             
-            {#if element.shadow}
-              <!-- Shadow -->
+            {#if element.shadow && element.bgColor !== 'none'}
+              <!-- Shadow (only show when background is not transparent) -->
               <rect 
                 x={element.x + 3} 
                 y={element.y + 3} 
@@ -1392,7 +1414,8 @@
               fill={element.bgColor || '#ffffff'} 
               stroke="#000000" 
               stroke-width="2"
-              stroke-dasharray={element.dashed ? "5,5" : "none"} />
+              stroke-dasharray={element.dashed ? "5,5" : "none"}
+              pointer-events="all" />
             
             {#if editingText?.id === element.id}
               <!-- Inline editing with foreignObject -->
@@ -1486,8 +1509,8 @@
             onclick={(e) => handleElementClick(e, element)}
             ondblclick={(e) => handleDoubleClick(e, element)}>
             
-            {#if element.shadow}
-              <!-- Shadow -->
+            {#if element.shadow && element.bgColor !== 'none'}
+              <!-- Shadow (only show when background is not transparent) -->
               <circle 
                 cx={element.x + element.radius + 3} 
                 cy={element.y + element.radius + 3} 
@@ -1504,7 +1527,8 @@
               fill={element.bgColor || '#ffffff'} 
               stroke="#000000" 
               stroke-width="2"
-              stroke-dasharray={element.dashed ? "5,5" : "none"} />
+              stroke-dasharray={element.dashed ? "5,5" : "none"}
+              pointer-events="all" />
             
             {#if editingText?.id === element.id}
               <!-- Inline editing with foreignObject -->
@@ -1746,6 +1770,14 @@
       {/if}
       
       {#if selectedElement.type === 'box'}
+        <label class="checkbox">
+          <input 
+            type="checkbox" 
+            bind:checked={selectedElement.locked}
+          />
+          Locked (prevents moving/resizing)
+        </label>
+        
         <label>
           Width:
           <input 
@@ -1778,7 +1810,7 @@
         
         <label>
           Background:
-          <div class="color-buttons">
+          <div class="color-buttons-grid">
             <button 
               class="color-btn"
               class:active={selectedElement.bgColor === '#000000'}
@@ -1799,6 +1831,13 @@
               style="background: #ff5722; color: white;"
               onclick={() => selectedElement.bgColor = '#ff5722'}>
               Orange
+            </button>
+            <button 
+              class="color-btn"
+              class:active={selectedElement.bgColor === 'none'}
+              style="background: repeating-conic-gradient(#ccc 0% 25%, transparent 0% 50%) 50% / 10px 10px; color: black; border: 1px solid #000;"
+              onclick={() => selectedElement.bgColor = 'none'}>
+              Clear
             </button>
           </div>
         </label>
@@ -1848,6 +1887,14 @@
       {/if}
       
       {#if selectedElement.type === 'circle'}
+        <label class="checkbox">
+          <input 
+            type="checkbox" 
+            bind:checked={selectedElement.locked}
+          />
+          Locked (prevents moving/resizing)
+        </label>
+        
         <label>
           Radius:
           <input 
@@ -1870,7 +1917,7 @@
         
         <label>
           Background:
-          <div class="color-buttons">
+          <div class="color-buttons-grid">
             <button 
               class="color-btn"
               class:active={selectedElement.bgColor === '#000000'}
@@ -1891,6 +1938,13 @@
               style="background: #ff5722; color: white;"
               onclick={() => selectedElement.bgColor = '#ff5722'}>
               Orange
+            </button>
+            <button 
+              class="color-btn"
+              class:active={selectedElement.bgColor === 'none'}
+              style="background: repeating-conic-gradient(#ccc 0% 25%, transparent 0% 50%) 50% / 10px 10px; color: black; border: 1px solid #000;"
+              onclick={() => selectedElement.bgColor = 'none'}>
+              Clear
             </button>
           </div>
         </label>
@@ -1940,6 +1994,14 @@
       {/if}
       
       {#if selectedElement.type === 'text'}
+        <label class="checkbox">
+          <input 
+            type="checkbox" 
+            bind:checked={selectedElement.locked}
+          />
+          Locked (prevents moving)
+        </label>
+        
         <label>
           Font Size:
           <input 
@@ -1952,6 +2014,14 @@
       {/if}
       
       {#if selectedElement.type === 'line'}
+        <label class="checkbox">
+          <input 
+            type="checkbox" 
+            bind:checked={selectedElement.locked}
+          />
+          Locked (prevents moving/resizing)
+        </label>
+        
         <div class="inline-edit-hint">
           💡 Double-click line to add label. Press Enter for line breaks, Esc to finish.
         </div>
@@ -2099,6 +2169,13 @@
     margin-top: 4px;
   }
   
+  .color-buttons-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-top: 4px;
+  }
+  
   .color-btn {
     flex: 1;
     padding: 6px 4px;
@@ -2108,6 +2185,11 @@
     font-size: 9px;
     font-weight: 400;
     transition: all 0.2s ease;
+    min-height: 30px;
+  }
+  
+  .color-buttons-grid .color-btn {
+    flex: none;
   }
   
   .color-btn:hover {
