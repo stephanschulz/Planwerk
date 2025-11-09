@@ -26,6 +26,8 @@
   let panStartY = $state(0);
   let isSpacePressed = $state(false);
   let showAboutModal = $state(false);
+  let showHint = $state(true);
+  let hintTimeout = null;
   
   // Template for new elements
   function createBox(x, y) {
@@ -434,6 +436,13 @@
   }
   
   function handleMouseMove(e) {
+    // Show hint and reset fade timer
+    showHint = true;
+    if (hintTimeout) clearTimeout(hintTimeout);
+    hintTimeout = setTimeout(() => {
+      showHint = false;
+    }, 3000);
+    
     // Handle panning
     if (isPanning) {
       panX = e.clientX - panStartX;
@@ -1592,7 +1601,7 @@
       </g>
     </svg>
     
-    <div class="canvas-hint">
+    <div class="canvas-hint" class:fade-out={!showHint}>
       {#if tool === 'select'}
         Click: select • Ctrl/Cmd+Click: multi-select • Drag: move • Arrow keys: nudge 1px • Ctrl/Cmd+C: copy • Ctrl/Cmd+V: paste • Hold S: snap to grid (move/resize) • Hold Shift: box→square / line→angle-snap • Double-click: edit text
       {:else if tool === 'box'}
@@ -2229,6 +2238,12 @@
     font-family: ui-monospace, 'Courier New', monospace;
     font-size: 11px;
     pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.5s ease-in-out;
+  }
+  
+  .canvas-hint.fade-out {
+    opacity: 0;
   }
   
   .about-btn {
