@@ -151,6 +151,26 @@
     };
   }
   
+  // Helper function to snap line to vertical/horizontal
+  function snapLineToAxis(x1, y1, x2, y2) {
+    const dx = Math.abs(x2 - x1);
+    const dy = Math.abs(y2 - y1);
+    const threshold = gridSize * 0.5; // Snap if within half a grid size
+    
+    // If close to horizontal, make it perfectly horizontal
+    if (dy < threshold && dy < dx) {
+      return { x1, y1, x2, y2: y1 };
+    }
+    
+    // If close to vertical, make it perfectly vertical
+    if (dx < threshold && dx < dy) {
+      return { x1, y1, x2: x1, y2 };
+    }
+    
+    // Otherwise return as is
+    return { x1, y1, x2, y2 };
+  }
+  
   // Helper function to find the closest point on a line segment
   function closestPointOnLineSegment(x, y, x1, y1, x2, y2) {
     const dx = x2 - x1;
@@ -384,6 +404,13 @@
           let finalX = snapPoint ? snapPoint.x : currentX;
           let finalY = snapPoint ? snapPoint.y : currentY;
           
+          // Apply grid snapping if 's' key is held
+          if (isSnapKeyPressed) {
+            const snapped = snapToGrid(finalX, finalY);
+            finalX = snapped.x;
+            finalY = snapped.y;
+          }
+          
           if (e.shiftKey) {
             // Snap to 15-degree intervals relative to the other end
             const angle = Math.atan2(finalY - selectedElement.y2, finalX - selectedElement.x2);
@@ -394,6 +421,15 @@
           } else {
             selectedElement.x1 = finalX;
             selectedElement.y1 = finalY;
+            
+            // Apply axis snapping if 's' key is held
+            if (isSnapKeyPressed) {
+              const snapped = snapLineToAxis(selectedElement.x1, selectedElement.y1, selectedElement.x2, selectedElement.y2);
+              selectedElement.x1 = snapped.x1;
+              selectedElement.y1 = snapped.y1;
+              selectedElement.x2 = snapped.x2;
+              selectedElement.y2 = snapped.y2;
+            }
           }
         } else if (resizeHandle === 'end') {
           // Check for snap points
@@ -409,6 +445,13 @@
             finalY = snapPoint.y - circleRadius * Math.sin(angle);
           }
           
+          // Apply grid snapping if 's' key is held
+          if (isSnapKeyPressed) {
+            const snapped = snapToGrid(finalX, finalY);
+            finalX = snapped.x;
+            finalY = snapped.y;
+          }
+          
           if (e.shiftKey) {
             // Snap to 15-degree intervals relative to the start
             const angle = Math.atan2(finalY - selectedElement.y1, finalX - selectedElement.x1);
@@ -419,6 +462,15 @@
           } else {
             selectedElement.x2 = finalX;
             selectedElement.y2 = finalY;
+            
+            // Apply axis snapping if 's' key is held
+            if (isSnapKeyPressed) {
+              const snapped = snapLineToAxis(selectedElement.x1, selectedElement.y1, selectedElement.x2, selectedElement.y2);
+              selectedElement.x1 = snapped.x1;
+              selectedElement.y1 = snapped.y1;
+              selectedElement.x2 = snapped.x2;
+              selectedElement.y2 = snapped.y2;
+            }
           }
         }
       }
@@ -437,10 +489,28 @@
       if (selectedElement.type === 'line') {
         const width = dragStart.elementX2 - dragStart.elementX;
         const height = dragStart.elementY2 - dragStart.elementY;
-        selectedElement.x1 = finalX;
-        selectedElement.y1 = finalY;
-        selectedElement.x2 = finalX + width;
-        selectedElement.y2 = finalY + height;
+        
+        if (isSnapKeyPressed) {
+          // Snap both endpoints to grid
+          const snappedStart = snapToGrid(finalX, finalY);
+          const snappedEnd = snapToGrid(finalX + width, finalY + height);
+          selectedElement.x1 = snappedStart.x;
+          selectedElement.y1 = snappedStart.y;
+          selectedElement.x2 = snappedEnd.x;
+          selectedElement.y2 = snappedEnd.y;
+          
+          // Also apply axis snapping
+          const axisSnapped = snapLineToAxis(selectedElement.x1, selectedElement.y1, selectedElement.x2, selectedElement.y2);
+          selectedElement.x1 = axisSnapped.x1;
+          selectedElement.y1 = axisSnapped.y1;
+          selectedElement.x2 = axisSnapped.x2;
+          selectedElement.y2 = axisSnapped.y2;
+        } else {
+          selectedElement.x1 = finalX;
+          selectedElement.y1 = finalY;
+          selectedElement.x2 = finalX + width;
+          selectedElement.y2 = finalY + height;
+        }
       } else {
         selectedElement.x = finalX;
         selectedElement.y = finalY;
@@ -812,7 +882,7 @@
         />
       </label>
       
-      <p class="grid-hint">Hold 'S' while dragging to snap to grid</p>
+      <p class="grid-hint">Hold 'S' while dragging to snap to grid. Lines also snap to vertical/horizontal when close.</p>
     </div>
   </div>
   </div>
@@ -891,31 +961,32 @@
                 y={element.y} 
                 width={element.width} 
                 height={element.height}>
-                <input 
+                <textarea 
                   id={`edit-${element.id}`}
-                  type="text" 
                   bind:value={element.text}
                   onblur={finishEditingText}
                   onkeydown={(e) => {
-                    if (e.key === 'Enter') finishEditingText();
                     if (e.key === 'Escape') finishEditingText();
                     e.stopPropagation();
                   }}
                   class="inline-text-edit"
-                  style="width: 100%; height: 100%; text-align: center; font-family: ui-monospace, 'Courier New', monospace; font-size: 12px; border: 2px solid #ff5722; background: white;"
+                  style="width: 100%; height: 100%; text-align: center; font-family: ui-monospace, 'Courier New', monospace; font-size: 12px; border: 2px solid #ff5722; background: white; resize: none; overflow: auto;"
                 />
               </foreignObject>
             {:else}
+              {@const lines = (element.text || '').split('\n')}
               <text 
                 x={element.x + element.width / 2} 
-                y={element.y + element.height / 2} 
+                y={element.y + element.height / 2 - (lines.length - 1) * (element.fontSize || 12) * 0.5} 
                 font-family="ui-monospace, 'Courier New', monospace" 
                 font-size={element.fontSize || 12} 
                 text-anchor="middle" 
                 dominant-baseline="middle" 
                 fill={element.textColor || '#000000'}
                 pointer-events="none">
-                {element.text}
+                {#each lines as line, i}
+                  <tspan x={element.x + element.width / 2} dy={i === 0 ? 0 : (element.fontSize || 12)}>{line}</tspan>
+                {/each}
               </text>
             {/if}
             
@@ -999,34 +1070,35 @@
               <!-- Inline editing with foreignObject -->
               <foreignObject 
                 x={element.x} 
-                y={element.y + element.radius - 15} 
+                y={element.y} 
                 width={element.radius * 2} 
-                height="30">
-                <input 
+                height={element.radius * 2}>
+                <textarea 
                   id={`edit-${element.id}`}
-                  type="text" 
                   bind:value={element.text}
                   onblur={finishEditingText}
                   onkeydown={(e) => {
-                    if (e.key === 'Enter') finishEditingText();
                     if (e.key === 'Escape') finishEditingText();
                     e.stopPropagation();
                   }}
                   class="inline-text-edit"
-                  style="width: 100%; height: 100%; text-align: center; font-family: ui-monospace, 'Courier New', monospace; font-size: 12px; border: 2px solid #ff5722; background: white;"
+                  style="width: 100%; height: 100%; text-align: center; font-family: ui-monospace, 'Courier New', monospace; font-size: 12px; border: 2px solid #ff5722; background: white; resize: none; overflow: auto;"
                 />
               </foreignObject>
             {:else}
+              {@const lines = (element.text || '').split('\n')}
               <text 
                 x={element.x + element.radius} 
-                y={element.y + element.radius} 
+                y={element.y + element.radius - (lines.length - 1) * (element.fontSize || 12) * 0.5} 
                 font-family="ui-monospace, 'Courier New', monospace" 
                 font-size={element.fontSize || 12} 
                 text-anchor="middle" 
                 dominant-baseline="middle" 
                 fill={element.textColor || '#000000'}
                 pointer-events="none">
-                {element.text}
+                {#each lines as line, i}
+                  <tspan x={element.x + element.radius} dy={i === 0 ? 0 : (element.fontSize || 12)}>{line}</tspan>
+                {/each}
               </text>
             {/if}
             
@@ -1118,35 +1190,36 @@
             <!-- Line label centered above line -->
             {#if editingText?.id === element.id && editingLineLabel}
               <foreignObject 
-                x={midX - 75} 
-                y={midY - 20} 
-                width="150" 
-                height="30">
-                <input 
+                x={midX - 100} 
+                y={midY - 60} 
+                width="200" 
+                height="60">
+                <textarea 
                   id={`edit-line-label-${element.id}`}
-                  type="text" 
                   bind:value={element.label}
                   onblur={finishEditingText}
                   onkeydown={(e) => {
-                    if (e.key === 'Enter') finishEditingText();
                     if (e.key === 'Escape') finishEditingText();
                     e.stopPropagation();
                   }}
                   class="inline-text-edit"
-                  style="width: 100%; text-align: center; font-family: ui-monospace, 'Courier New', monospace; font-size: 11px; border: 2px solid #ff5722; background: white; padding: 2px;"
+                  style="width: 100%; height: 100%; text-align: center; font-family: ui-monospace, 'Courier New', monospace; font-size: 11px; border: 2px solid #ff5722; background: white; padding: 2px; resize: none; overflow: auto;"
                 />
               </foreignObject>
             {:else if element.label && element.label !== ''}
+              {@const labelLines = (element.label || '').split('\n')}
               <text 
                 x={midX} 
-                y={midY - 4} 
+                y={midY - 4 - (labelLines.length - 1) * (element.labelSize || 11) * 0.5} 
                 font-family="ui-monospace, 'Courier New', monospace" 
                 font-size={element.labelSize || 11} 
                 text-anchor="middle" 
                 dominant-baseline="baseline" 
                 fill="#000000"
                 pointer-events="none">
-                {element.label}
+                {#each labelLines as labelLine, i}
+                  <tspan x={midX} dy={i === 0 ? 0 : (element.labelSize || 11)}>{labelLine}</tspan>
+                {/each}
               </text>
             {/if}
             
@@ -1190,29 +1263,30 @@
                 x={element.x} 
                 y={element.y - (element.fontSize || 14)} 
                 width="300" 
-                height={(element.fontSize || 14) * 2}>
-                <input 
+                height="150">
+                <textarea 
                   id={`edit-${element.id}`}
-                  type="text" 
                   bind:value={element.text}
                   onblur={finishEditingText}
                   onkeydown={(e) => {
-                    if (e.key === 'Enter') finishEditingText();
                     if (e.key === 'Escape') finishEditingText();
                     e.stopPropagation();
                   }}
                   class="inline-text-edit"
-                  style="width: 100%; height: 100%; font-family: ui-monospace, 'Courier New', monospace; font-size: {element.fontSize || 14}px; border: 2px solid #ff5722; background: white; padding: 4px;"
+                  style="width: 100%; height: 100%; font-family: ui-monospace, 'Courier New', monospace; font-size: {element.fontSize || 14}px; border: 2px solid #ff5722; background: white; padding: 4px; resize: none; overflow: auto;"
                 />
               </foreignObject>
             {:else}
+              {@const textLines = (element.text || '').split('\n')}
               <text 
                 x={element.x} 
                 y={element.y} 
                 font-family="ui-monospace, 'Courier New', monospace" 
                 font-size={element.fontSize || 14} 
                 fill="#000000">
-                {element.text}
+                {#each textLines as textLine, i}
+                  <tspan x={element.x} dy={i === 0 ? 0 : (element.fontSize || 14)}>{textLine}</tspan>
+                {/each}
               </text>
             {/if}
           </g>
@@ -1222,15 +1296,15 @@
     
     <div class="canvas-hint">
       {#if tool === 'select'}
-        Click: select • Drag: move • Double-click: edit text/add line label • Arrow keys: nudge 1px • Line snap to edges • Hold Shift: box→square / line→angle-snap
+        Click: select • Drag: move • Double-click: edit text/add line label • Arrow keys: nudge 1px • Line snap to edges • Hold Shift: box→square / line→angle-snap • Hold S: snap to grid • Enter: line break in text
       {:else if tool === 'box'}
-        Click anywhere to add a box • Hold Shift while resizing to force square
+        Click anywhere to add a box • Hold Shift while resizing to force square • Hold S while dragging to snap to grid • When editing: Enter creates line break
       {:else if tool === 'circle'}
-        Click anywhere to add a circle
+        Click anywhere to add a circle • Hold S while dragging to snap to grid • When editing: Enter creates line break
       {:else if tool === 'text'}
-        Click anywhere to add text
+        Click anywhere to add text • Hold S while dragging to snap to grid • When editing: Enter creates line break
       {:else if tool === 'line'}
-        Click anywhere to add a line (use Properties panel to add circle/arrow)
+        Click anywhere to add a line (use Properties panel to add circle/arrow) • Hold S while dragging endpoints to snap to grid • When editing label: Enter creates line break
       {/if}
     </div>
   </div>
@@ -1241,7 +1315,7 @@
       
       {#if selectedElement.text !== undefined}
         <div class="inline-edit-hint">
-          💡 Double-click to edit text inline
+          💡 Double-click to edit text inline. Press Enter for line breaks, Esc to finish.
         </div>
       {/if}
       
@@ -1453,7 +1527,7 @@
       
       {#if selectedElement.type === 'line'}
         <div class="inline-edit-hint">
-          💡 Double-click line to add label
+          💡 Double-click line to add label. Press Enter for line breaks, Esc to finish.
         </div>
         
         <label>
