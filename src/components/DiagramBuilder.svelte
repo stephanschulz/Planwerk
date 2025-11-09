@@ -32,6 +32,37 @@
   let selectionRect = $state(null); // { startX, startY, endX, endY } in canvas coordinates
   let isDrawingSelection = $state(false);
   let justFinishedSelection = $state(false);
+  let history = $state([]);
+  let historyIndex = $state(-1);
+  let maxHistorySize = 50;
+  
+  // History management
+  function saveHistory() {
+    // Remove any history after current index (if user did undo, then made a change)
+    history = history.slice(0, historyIndex + 1);
+    
+    // Deep clone the elements array
+    const snapshot = JSON.parse(JSON.stringify(elements));
+    history.push(snapshot);
+    
+    // Limit history size
+    if (history.length > maxHistorySize) {
+      history.shift();
+    } else {
+      historyIndex++;
+    }
+  }
+  
+  function undo() {
+    if (historyIndex > 0) {
+      historyIndex--;
+      elements = JSON.parse(JSON.stringify(history[historyIndex]));
+      selectedElements = [];
+      selectedElement = null;
+      editingText = null;
+      editingLineLabel = false;
+    }
+  }
   
   // Template for new elements
   function createBox(x, y) {
@@ -195,12 +226,16 @@
     const { x, y } = screenToCanvas(e.clientX, e.clientY);
     
     if (tool === 'box') {
+      saveHistory();
       elements = [...elements, createBox(x, y)];
     } else if (tool === 'circle') {
+      saveHistory();
       elements = [...elements, createCircle(x, y)];
     } else if (tool === 'text') {
+      saveHistory();
       elements = [...elements, createText(x, y)];
     } else if (tool === 'line') {
+      saveHistory();
       elements = [...elements, createLine(x, y)];
     }
     
@@ -906,6 +941,11 @@
       return;
     }
     
+    // Save history after dragging or resizing
+    if (isDragging || isResizing) {
+      saveHistory();
+    }
+    
     isDragging = false;
     isResizing = false;
     resizeHandle = null;
@@ -915,6 +955,7 @@
   
   function deleteSelected() {
     if (selectedElements.length > 0) {
+      saveHistory();
       const selectedIds = selectedElements.map(el => el.id);
       elements = elements.filter(el => !selectedIds.includes(el.id));
       selectedElements = [];
@@ -928,6 +969,7 @@
   }
   
   function pasteFromClipboard() {
+    saveHistory();
     const offset = 20; // Offset pasted elements by 20px
     const newIds = [];
     const baseId = Date.now();
@@ -977,6 +1019,13 @@
     
     // Don't process any keys if we're editing text
     if (editingText || editingLineLabel) {
+      return;
+    }
+    
+    // Undo: Ctrl/Cmd+Z
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      undo();
       return;
     }
     
@@ -1087,7 +1136,6 @@
     
     localStorage.setItem('savedDesigns', JSON.stringify(designs));
     loadSavedDesignsList();
-    alert(`Design "${name}" saved!`);
   }
   
   function loadSavedDesignsList() {
@@ -1100,9 +1148,14 @@
   function loadDesign(name) {
     const designs = JSON.parse(localStorage.getItem('savedDesigns') || '{}');
     if (designs[name]) {
+      saveHistory();
       elements = designs[name].elements;
       currentDesignName = name;
       selectedElement = null;
+      // Reset history after loading
+      history = [];
+      historyIndex = -1;
+      saveHistory();
       alert(`Design "${name}" loaded!`);
     }
   }
@@ -1125,9 +1178,14 @@
     if (elements.length > 0 && !confirm('Start a new design? Unsaved changes will be lost.')) {
       return;
     }
+    saveHistory();
     elements = [];
     currentDesignName = 'Untitled';
     selectedElement = null;
+    // Reset history for new design
+    history = [];
+    historyIndex = -1;
+    saveHistory();
   }
   
   function exportDiagram() {
@@ -1152,8 +1210,13 @@
         const reader = new FileReader();
         reader.onload = (event) => {
           try {
+            saveHistory();
             elements = JSON.parse(event.target.result);
             selectedElement = null;
+            // Reset history after import
+            history = [];
+            historyIndex = -1;
+            saveHistory();
             alert('Diagram imported!');
           } catch (error) {
             alert('Error importing diagram: ' + error.message);
@@ -1169,6 +1232,8 @@
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     loadSavedDesignsList();
+    // Initialize history with empty state
+    saveHistory();
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
@@ -1253,7 +1318,7 @@
       
       <button 
         class="action-btn"
-        onclick={() => elements = []}
+        onclick={() => { saveHistory(); elements = []; }}
         title="Clear Canvas">
         Clear All
       </button>
@@ -1670,7 +1735,8 @@
               x2={element.x2} 
               y2={element.y2} 
               stroke="transparent" 
-              stroke-width="20" />
+              stroke-width="40" 
+              pointer-events="stroke" />
             
             <!-- Line label centered above line -->
             {#if editingText?.id === element.id && editingLineLabel}
@@ -1800,7 +1866,7 @@
     
     <div class="canvas-hint" class:fade-out={!showHint}>
       {#if tool === 'select'}
-        Click: select • Ctrl/Cmd+Click: multi-select • Hold M + Drag: area select • Drag: move • Arrow keys: nudge 1px • Ctrl/Cmd+C: copy • Ctrl/Cmd+V: paste • Hold S: snap to grid (move/resize) • Hold Shift: box→square / line→angle-snap • Double-click: edit text
+        Click: select • Ctrl/Cmd+Click: multi-select • Hold M + Drag: area select • Drag: move • Arrow keys: nudge 1px • Ctrl/Cmd+C: copy • Ctrl/Cmd+V: paste • Ctrl/Cmd+Z: undo • Hold S: snap to grid (move/resize) • Hold Shift: box→square / line→angle-snap • Double-click: edit text
       {:else if tool === 'box'}
         Click anywhere to add a box • Hold Shift while resizing to force square • Hold S while dragging/resizing to snap to grid • When editing: Enter creates line break
       {:else if tool === 'circle'}
