@@ -18,6 +18,13 @@
   let gridSize = $state(20);
   let isSnapKeyPressed = $state(false);
   let clipboard = $state([]);
+  let zoomLevel = $state(1);
+  let panX = $state(0);
+  let panY = $state(0);
+  let isPanning = $state(false);
+  let panStartX = $state(0);
+  let panStartY = $state(0);
+  let isSpacePressed = $state(false);
   
   // Template for new elements
   function createBox(x, y) {
@@ -78,7 +85,79 @@
     };
   }
   
+  // Transform screen coordinates to canvas coordinates (accounting for zoom and pan)
+  function screenToCanvas(screenX, screenY) {
+    const rect = canvasElement.getBoundingClientRect();
+    const x = (screenX - rect.left - panX) / zoomLevel;
+    const y = (screenY - rect.top - panY) / zoomLevel;
+    return { x, y };
+  }
+  
+  function zoomToPoint(newZoom, screenX, screenY) {
+    const rect = canvasElement.getBoundingClientRect();
+    const mouseX = screenX - rect.left;
+    const mouseY = screenY - rect.top;
+    
+    // Calculate canvas coordinates under mouse before zoom
+    const canvasX = (mouseX - panX) / zoomLevel;
+    const canvasY = (mouseY - panY) / zoomLevel;
+    
+    // Apply new zoom level
+    zoomLevel = Math.max(0.1, Math.min(newZoom, 5));
+    
+    // Adjust pan so the same canvas point is under the mouse
+    panX = mouseX - canvasX * zoomLevel;
+    panY = mouseY - canvasY * zoomLevel;
+  }
+  
+  function zoomIn() {
+    // Zoom to center of canvas
+    const rect = canvasElement.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    zoomToPoint(zoomLevel * 1.1, centerX, centerY);
+  }
+  
+  function zoomOut() {
+    // Zoom to center of canvas
+    const rect = canvasElement.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    zoomToPoint(zoomLevel / 1.1, centerX, centerY);
+  }
+  
+  function resetZoom() {
+    zoomLevel = 1;
+    panX = 0;
+    panY = 0;
+  }
+  
+  function handleWheel(e) {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const delta = e.deltaY;
+      const zoomFactor = delta < 0 ? 1.05 : 1 / 1.05;
+      zoomToPoint(zoomLevel * zoomFactor, e.clientX, e.clientY);
+    }
+  }
+  
+  function handleCanvasMouseDown(e) {
+    // Check if space key is pressed for panning
+    if (isSpacePressed) {
+      isPanning = true;
+      panStartX = e.clientX - panX;
+      panStartY = e.clientY - panY;
+      e.preventDefault();
+      return;
+    }
+  }
+  
   function handleCanvasClick(e) {
+    // Don't place elements if we're panning
+    if (isPanning) {
+      return;
+    }
+    
     if (tool === 'select') {
       selectedElement = null;
       selectedElements = [];
@@ -87,9 +166,7 @@
       return;
     }
     
-    const rect = canvasElement.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const { x, y } = screenToCanvas(e.clientX, e.clientY);
     
     if (tool === 'box') {
       elements = [...elements, createBox(x, y)];
@@ -310,7 +387,7 @@
     selectedElement = element;
     isDragging = true;
     
-    const rect = canvasElement.getBoundingClientRect();
+    const { x, y } = screenToCanvas(e.clientX, e.clientY);
     
     // Store initial positions for all selected elements
     const elementsData = selectedElements.map(el => ({
@@ -322,8 +399,8 @@
     }));
     
     dragStart = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: x,
+      y: y,
       elementX: element.x || element.x1,
       elementY: element.y || element.y1,
       elementWidth: element.width,
@@ -341,10 +418,10 @@
     isResizing = true;
     resizeHandle = handle;
     
-    const rect = canvasElement.getBoundingClientRect();
+    const { x, y } = screenToCanvas(e.clientX, e.clientY);
     dragStart = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: x,
+      y: y,
       elementX: element.x || element.x1,
       elementY: element.y || element.y1,
       elementWidth: element.width,
@@ -356,11 +433,16 @@
   }
   
   function handleMouseMove(e) {
+    // Handle panning
+    if (isPanning) {
+      panX = e.clientX - panStartX;
+      panY = e.clientY - panStartY;
+      return;
+    }
+    
     if ((!isDragging && !isResizing) || !dragStart || !selectedElement) return;
     
-    const rect = canvasElement.getBoundingClientRect();
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
+    const { x: currentX, y: currentY } = screenToCanvas(e.clientX, e.clientY);
     
     const dx = currentX - dragStart.x;
     const dy = currentY - dragStart.y;
@@ -662,6 +744,7 @@
     isResizing = false;
     resizeHandle = null;
     dragStart = null;
+    isPanning = false;
   }
   
   function deleteSelected() {
@@ -713,6 +796,12 @@
     // Track 's' key for snap-to-grid
     if (e.key === 's' || e.key === 'S') {
       isSnapKeyPressed = true;
+    }
+    
+    // Track space key for panning (but don't pan if editing text)
+    if (e.key === ' ' && !editingText && !editingLineLabel) {
+      isSpacePressed = true;
+      e.preventDefault();
     }
     
     // Don't process any keys if we're editing text
@@ -783,6 +872,12 @@
     // Track 's' key release for snap-to-grid
     if (e.key === 's' || e.key === 'S') {
       isSnapKeyPressed = false;
+    }
+    
+    // Track space key release for panning
+    if (e.key === ' ') {
+      isSpacePressed = false;
+      isPanning = false;
     }
   }
   
@@ -1047,6 +1142,39 @@
     </div>
     
     <div class="tool-section">
+      <h3>Zoom & View</h3>
+      
+      <div class="button-row">
+        <button 
+          class="action-btn"
+          onclick={zoomIn}
+          title="Zoom In (Ctrl/Cmd + Scroll)">
+          Zoom In
+        </button>
+        
+        <button 
+          class="action-btn"
+          onclick={zoomOut}
+          title="Zoom Out (Ctrl/Cmd + Scroll)">
+          Zoom Out
+        </button>
+      </div>
+      
+      <button 
+        class="action-btn"
+        onclick={resetZoom}
+        title="Reset Zoom to 100%">
+        Reset View
+      </button>
+      
+      <p class="grid-hint">
+        Zoom: {Math.round(zoomLevel * 100)}%<br/>
+        Hold Ctrl/Cmd + Scroll to zoom<br/>
+        Hold Space + Drag to pan
+      </p>
+    </div>
+    
+    <div class="tool-section">
       <h3>Grid</h3>
       
       <button 
@@ -1084,8 +1212,12 @@
   
   <div 
     class="canvas"
+    class:space-pressed={isSpacePressed && !isPanning}
+    class:panning={isPanning}
     bind:this={canvasElement}
     onclick={handleCanvasClick}
+    onmousedown={handleCanvasMouseDown}
+    onwheel={handleWheel}
     role="application"
     aria-label="Diagram canvas">
     
@@ -1118,6 +1250,7 @@
         <rect width="100%" height="100%" fill="url(#grid)" />
       {/if}
       
+      <g transform="translate({panX}, {panY}) scale({zoomLevel})">
       {#each elements as element (element.id)}
         {#if element.type === 'box'}
           <g 
@@ -1454,6 +1587,7 @@
           </g>
         {/if}
       {/each}
+      </g>
     </svg>
     
     <div class="canvas-hint">
@@ -2020,6 +2154,14 @@
   
   .canvas[data-tool="select"] {
     cursor: default;
+  }
+  
+  .canvas.space-pressed {
+    cursor: grab !important;
+  }
+  
+  .canvas.panning {
+    cursor: grabbing !important;
   }
   
   .diagram-svg {
