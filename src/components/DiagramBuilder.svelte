@@ -950,7 +950,8 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'diagram.json';
+    const fileName = (projectName.trim() || 'Untitled') + '.json';
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
   }
