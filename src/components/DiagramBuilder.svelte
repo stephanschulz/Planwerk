@@ -25,6 +25,7 @@
   let panStartX = $state(0);
   let panStartY = $state(0);
   let isSpacePressed = $state(false);
+  let showAboutModal = $state(false);
   
   // Template for new elements
   function createBox(x, y) {
@@ -1858,6 +1859,28 @@
   {/if}
 </div>
 
+<!-- About Button -->
+<button 
+  class="about-btn" 
+  onclick={() => showAboutModal = !showAboutModal}
+  title="About Planwerk">
+  ℹ️
+</button>
+
+<!-- About Modal -->
+{#if showAboutModal}
+  <div class="modal-overlay" onclick={() => showAboutModal = false}>
+    <div class="modal-content" onclick={(e) => e.stopPropagation()}>
+      <button class="modal-close" onclick={() => showAboutModal = false}>×</button>
+      <h2>About Planwerk</h2>
+      <p>Made by <strong>Stephan Schulz</strong></p>
+      <a href="https://github.com/stephanschulz/Planwerk/" target="_blank" rel="noopener noreferrer">
+        View on GitHub →
+      </a>
+    </div>
+  </div>
+{/if}
+
 <style>
   .builder-container {
     display: flex;
@@ -2208,6 +2231,105 @@
     font-family: ui-monospace, 'Courier New', monospace;
     font-size: 11px;
     pointer-events: none;
+  }
+  
+  .about-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #000000;
+    color: white;
+    border: 2px solid #000000;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+  
+  .about-btn:hover {
+    background: #333333;
+    transform: scale(1.1);
+  }
+  
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+  }
+  
+  .modal-content {
+    background: white;
+    padding: 32px;
+    border: 2px solid #000000;
+    border-radius: 8px;
+    max-width: 400px;
+    width: 90%;
+    position: relative;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  }
+  
+  .modal-content h2 {
+    margin: 0 0 16px 0;
+    font-size: 24px;
+    color: #000000;
+  }
+  
+  .modal-content p {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    color: #333333;
+  }
+  
+  .modal-content a {
+    display: inline-block;
+    color: #000000;
+    text-decoration: none;
+    font-weight: bold;
+    padding: 8px 16px;
+    border: 2px solid #000000;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+  
+  .modal-content a:hover {
+    background: #000000;
+    color: white;
+  }
+  
+  .modal-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: none;
+    border: none;
+    font-size: 32px;
+    cursor: pointer;
+    color: #666666;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    transition: color 0.2s;
+  }
+  
+  .modal-close:hover {
+    color: #000000;
   }
 </style>
 
