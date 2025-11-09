@@ -2235,8 +2235,8 @@
     position: fixed;
     bottom: 20px;
     right: 20px;
-    width: 6px;
-    height: 6px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
     background: #ff5722;
     border: 1px solid #000000;
