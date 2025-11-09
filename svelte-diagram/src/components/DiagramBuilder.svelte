@@ -117,25 +117,32 @@
         // Add to selection
         selectedElements = [...selectedElements, element];
       }
+      // Update selectedElement for backward compatibility
+      selectedElement = selectedElements[0] || null;
     } else {
-      // Single select
-      selectedElements = [element];
+      // If element is already selected, do nothing (keep selection as is)
+      const isAlreadySelected = selectedElements.find(el => el.id === element.id);
+      if (!isAlreadySelected) {
+        // Only change selection if clicking on an unselected element
+        selectedElements = [element];
+        selectedElement = element;
+      }
     }
-    
-    // Update selectedElement for backward compatibility
-    selectedElement = selectedElements[0] || null;
   }
   
   function handleDoubleClick(e, element) {
     e.stopPropagation();
     e.preventDefault();
     
+    // Single-select the double-clicked element for editing
+    selectedElements = [element];
+    selectedElement = element;
+    
     if (element.type === 'line') {
       // For lines, enable label editing
       if (element.label === undefined) {
         element.label = '';
       }
-      selectedElement = element;
       editingText = element;
       editingLineLabel = true;
       
@@ -513,8 +520,8 @@
       }
     } else if (isDragging) {
       // Handle dragging - move all selected elements together
-      if (dragStart.elementsData && dragStart.elementsData.length > 1) {
-        // Multi-element drag
+      if (dragStart.elementsData && dragStart.elementsData.length >= 1) {
+        // Multi-element drag (works for 1 or more elements)
         for (const data of dragStart.elementsData) {
           let newX = data.startX + dx;
           let newY = data.startY + dy;
