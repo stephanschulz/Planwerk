@@ -1246,6 +1246,84 @@
     input.click();
   }
   
+  function exportToPDF() {
+    // Get the SVG element
+    const svgElement = document.querySelector('.diagram-svg');
+    if (!svgElement) return;
+    
+    // Clone the SVG
+    const svgClone = svgElement.cloneNode(true);
+    
+    // Get all elements and calculate bounds
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    elements.forEach(el => {
+      if (el.type === 'box') {
+        minX = Math.min(minX, el.x);
+        minY = Math.min(minY, el.y);
+        maxX = Math.max(maxX, el.x + el.width);
+        maxY = Math.max(maxY, el.y + el.height);
+      } else if (el.type === 'circle') {
+        minX = Math.min(minX, el.x);
+        minY = Math.min(minY, el.y);
+        maxX = Math.max(maxX, el.x + el.radius * 2);
+        maxY = Math.max(maxY, el.y + el.radius * 2);
+      } else if (el.type === 'line') {
+        minX = Math.min(minX, el.x1, el.x2);
+        minY = Math.min(minY, el.y1, el.y2);
+        maxX = Math.max(maxX, el.x1, el.x2);
+        maxY = Math.max(maxY, el.y1, el.y2);
+      } else if (el.type === 'text') {
+        minX = Math.min(minX, el.x);
+        minY = Math.min(minY, el.y);
+        maxX = Math.max(maxX, el.x + 100); // Approximate text width
+        maxY = Math.max(maxY, el.y + 20); // Approximate text height
+      }
+    });
+    
+    // Add padding
+    const padding = 20;
+    minX -= padding;
+    minY -= padding;
+    maxX += padding;
+    maxY += padding;
+    
+    const width = maxX - minX;
+    const height = maxY - minY;
+    
+    // Create a new SVG with proper viewBox
+    const svgData = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" 
+     width="${width}" 
+     height="${height}" 
+     viewBox="${minX} ${minY} ${width} ${height}">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#000000" />
+    </marker>
+  </defs>
+  <rect width="100%" height="100%" fill="white"/>
+  ${svgClone.querySelector('g').outerHTML}
+</svg>`;
+    
+    // Create blob and download
+    const blob = new Blob([svgData], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    
+    // Open in new window for printing to PDF
+    const printWindow = window.open(url, '_blank');
+    if (printWindow) {
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+        }, 250);
+      };
+    }
+    
+    // Clean up
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  
   onMount(() => {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
@@ -1325,24 +1403,6 @@
     </div>
     
     <div class="tool-section">
-      <h3>Actions</h3>
-      <button 
-        class="action-btn"
-        onclick={deleteSelected}
-        disabled={!selectedElement}
-        title="Delete (Del)">
-        Delete
-      </button>
-      
-      <button 
-        class="action-btn"
-        onclick={() => { saveHistory(); elements = []; }}
-        title="Clear Canvas">
-        Clear All
-      </button>
-    </div>
-    
-    <div class="tool-section">
       <h3>File</h3>
       <label>
         Name:
@@ -1383,15 +1443,25 @@
           </select>
         </label>
         
-        <button 
-          class="action-btn delete-btn"
-          onclick={() => {
-            const select = document.querySelector('.design-select');
-            if (select.value) deleteDesign(select.value);
-          }}
-          title="Delete selected design">
-          Delete Selected
-        </button>
+        <div class="button-row">
+          <button 
+            class="action-btn delete-btn"
+            onclick={() => {
+              const select = document.querySelector('.design-select');
+              if (select.value) deleteDesign(select.value);
+            }}
+            title="Delete selected design">
+            Delete Selected
+          </button>
+          
+          <button 
+            class="action-btn"
+            onclick={exportToPDF}
+            disabled={elements.length === 0}
+            title="Export as PDF">
+            Make PDF
+          </button>
+        </div>
       {/if}
       
       <div class="button-row">
