@@ -2,6 +2,8 @@
 
 A lightweight, browser-based diagram tool for creating system architectures, flowcharts, and technical diagrams. Built to be simple, fast, and hackable.
 
+[👉 Try the Live Demo](https://stephanschulz.ca/Planwerk/)
+
 ## What is Planwerk?
 
 Planwerk is an interactive diagram builder that lets you create boxes, circles, lines, and text annotations directly in your browser. It's designed for quick sketching of system architectures, network diagrams, or any visual concept that needs boxes and arrows.
