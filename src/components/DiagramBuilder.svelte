@@ -79,6 +79,7 @@
       fontSize: 12,
       bgColor: '#ffffff',
       textColor: '#000000',
+      textPosition: 'middle', // 'top', 'middle', 'bottom'
       locked: false
     };
   }
@@ -1131,6 +1132,7 @@
     designs[name] = {
       name,
       elements,
+      gridSize,
       savedAt: new Date().toISOString()
     };
     
@@ -1150,6 +1152,7 @@
     if (designs[name]) {
       saveHistory();
       elements = designs[name].elements;
+      gridSize = designs[name].gridSize || 10; // Default to 10 if not saved
       currentDesignName = name;
       selectedElement = null;
       // Reset history after loading
@@ -1189,7 +1192,11 @@
   }
   
   function exportDiagram() {
-    const data = JSON.stringify(elements, null, 2);
+    const exportData = {
+      elements,
+      gridSize
+    };
+    const data = JSON.stringify(exportData, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1211,7 +1218,18 @@
         reader.onload = (event) => {
           try {
             saveHistory();
-            elements = JSON.parse(event.target.result);
+            const importedData = JSON.parse(event.target.result);
+            
+            // Handle both old format (array) and new format (object with elements and gridSize)
+            if (Array.isArray(importedData)) {
+              // Old format - just an array of elements
+              elements = importedData;
+            } else {
+              // New format - object with elements and gridSize
+              elements = importedData.elements || [];
+              gridSize = importedData.gridSize || 10;
+            }
+            
             selectedElement = null;
             // Reset history after import
             history = [];
@@ -1557,17 +1575,26 @@
               </foreignObject>
             {:else}
               {@const lines = (element.text || '').split('\n')}
+              {@const fontSize = element.fontSize || 12}
+              {@const textHeight = lines.length * fontSize}
+              {@const padding = 5}
+              {@const position = element.textPosition || 'middle'}
+              {@const yPos = position === 'top' 
+                ? element.y + padding + fontSize / 2
+                : position === 'bottom'
+                ? element.y + element.height - textHeight - padding + fontSize / 2
+                : element.y + element.height / 2 - (lines.length - 1) * fontSize * 0.5}
               <text 
                 x={element.x + element.width / 2} 
-                y={element.y + element.height / 2 - (lines.length - 1) * (element.fontSize || 12) * 0.5} 
+                y={yPos} 
                 font-family="ui-monospace, 'Courier New', monospace" 
-                font-size={element.fontSize || 12} 
+                font-size={fontSize} 
                 text-anchor="middle" 
                 dominant-baseline="middle" 
                 fill={element.textColor || '#000000'}
                 pointer-events="none">
                 {#each lines as line, i}
-                  <tspan x={element.x + element.width / 2} dy={i === 0 ? 0 : (element.fontSize || 12)}>{line}</tspan>
+                  <tspan x={element.x + element.width / 2} dy={i === 0 ? 0 : fontSize}>{line}</tspan>
                 {/each}
               </text>
             {/if}
@@ -1928,6 +1955,30 @@
             min="8"
             max="48"
           />
+        </label>
+        
+        <label>
+          Text Position:
+          <div class="color-buttons">
+            <button 
+              class="color-btn"
+              class:active={selectedElement.textPosition === 'top'}
+              onclick={() => selectedElement.textPosition = 'top'}>
+              Top
+            </button>
+            <button 
+              class="color-btn"
+              class:active={selectedElement.textPosition === 'middle' || !selectedElement.textPosition}
+              onclick={() => selectedElement.textPosition = 'middle'}>
+              Middle
+            </button>
+            <button 
+              class="color-btn"
+              class:active={selectedElement.textPosition === 'bottom'}
+              onclick={() => selectedElement.textPosition = 'bottom'}>
+              Bottom
+            </button>
+          </div>
         </label>
         
         <label>
