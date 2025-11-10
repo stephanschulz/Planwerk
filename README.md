@@ -6,6 +6,8 @@ A lightweight, browser-based diagram tool for creating system architectures, flo
 
 Planwerk is an interactive diagram builder that lets you create boxes, circles, lines, and text annotations directly in your browser. It's designed for quick sketching of system architectures, network diagrams, or any visual concept that needs boxes and arrows.
 
+![Example Diagram](images/Screenshot.jpg)
+
 ### Features
 - **Create diagrams** with boxes, circles, lines, and text
 - **Save & load designs** locally in your browser
